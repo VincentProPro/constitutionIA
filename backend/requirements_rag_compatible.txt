@@ -1,0 +1,23 @@
+# Dépendances de base
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy==2.0.23
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+PyPDF2==3.0.1
+httpx==0.25.2
+pytest==7.4.3
+
+# OpenAI - version compatible
+openai>=1.10.0,<2.0.0
+
+# Dépendances RAG - versions compatibles
+langchain>=0.1.0
+langchain-community>=0.0.10
+langchain-openai>=0.0.5
+faiss-cpu>=1.7.4
+tiktoken>=0.5.2 

@@ -1,260 +1,272 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   PaperAirplaneIcon,
+  UserIcon, 
   SparklesIcon,
-  DocumentTextIcon,
-  LightBulbIcon,
+  ArrowPathIcon,
   ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
-import axios from 'axios';
 
 interface Message {
   id: string;
-  type: 'user' | 'ai';
   content: string;
+  isUser: boolean;
   timestamp: Date;
-  sources?: any[];
-  confidence?: number;
-}
-
-interface Suggestion {
-  text: string;
-  category: string;
+  loading?: boolean;
 }
 
 const AICopilotPage: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      content: "Bonjour ! Je suis ConstitutionIA, votre assistant spécialisé dans la constitution de la Guinée. Comment puis-je vous aider aujourd'hui ?",
+      isUser: false,
+      timestamp: new Date()
+    }
+  ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const defaultSuggestions = [
-    { text: "Quels sont les droits fondamentaux garantis par la constitution ?", category: "droits" },
-    { text: "Comment est organisé le pouvoir exécutif ?", category: "pouvoirs" },
-    { text: "Quelles sont les procédures de révision constitutionnelle ?", category: "procédures" },
-    { text: "Comment sont protégés les droits des citoyens ?", category: "protection" },
-    { text: "Quelle est la structure du pouvoir judiciaire ?", category: "pouvoirs" },
-    { text: "Comment fonctionne le système électoral ?", category: "élections" },
-    { text: "Quels sont les principes de la démocratie ?", category: "principes" },
-    { text: "Comment est organisée l'administration publique ?", category: "administration" }
-  ];
-
-  useEffect(() => {
-    setSuggestions(defaultSuggestions);
-    // Message de bienvenue
-    setMessages([
-      {
-        id: '1',
-        type: 'ai',
-        content: "Bonjour ! Je suis votre assistant IA spécialisé dans les constitutions de la Guinée. Posez-moi vos questions sur les droits, les pouvoirs, les procédures ou tout autre aspect constitutionnel. Je peux vous aider à trouver des informations précises dans les documents constitutionnels.",
-        timestamp: new Date()
-      }
-    ]);
-  }, []);
+  // Auto-scroll vers le bas
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Créer une session au chargement
+  useEffect(() => {
+    const createSession = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/ai/session/create', {
+          method: 'POST'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setSessionId(data.session_id);
+        }
+      } catch (error) {
+        console.error('Erreur lors de la création de la session:', error);
+      }
+    };
 
-  const sendMessage = async (content: string) => {
-    if (!content.trim()) return;
+    createSession();
+  }, []);
+
+  const sendMessage = async () => {
+    if (!inputValue.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      type: 'user',
-      content,
+      content: inputValue,
+      isUser: true,
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const aiMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      content: '',
+      isUser: false,
+      timestamp: new Date(),
+      loading: true
+    };
+
+    setMessages(prev => [...prev, userMessage, aiMessage]);
     setInputValue('');
     setIsLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/ai/chat', {
-        query: content,
-        max_results: 5
+      const response = await fetch('http://localhost:8000/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: inputValue,
+          session_id: sessionId
+        }),
       });
 
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: response.data.answer,
-        timestamp: new Date(),
-        sources: response.data.sources,
-        confidence: response.data.confidence
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
+      if (response.ok) {
+        const data = await response.json();
+        
+        setMessages(prev => prev.map(msg => 
+          msg.id === aiMessage.id 
+            ? { ...msg, content: data.answer, loading: false }
+            : msg
+        ));
+      } else {
+        setMessages(prev => prev.map(msg => 
+          msg.id === aiMessage.id 
+            ? { ...msg, content: "Désolé, une erreur s'est produite. Veuillez réessayer.", loading: false }
+            : msg
+        ));
+      }
     } catch (error) {
       console.error('Erreur lors de l\'envoi du message:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: "Désolé, je n'ai pas pu traiter votre demande. Veuillez réessayer.",
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => prev.map(msg => 
+        msg.id === aiMessage.id 
+          ? { ...msg, content: "Désolé, une erreur s'est produite. Veuillez réessayer.", loading: false }
+          : msg
+      ));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
-    sendMessage(inputValue);
+      sendMessage();
+    }
   };
 
-  const handleSuggestionClick = (suggestion: string) => {
-    sendMessage(suggestion);
-  };
-
-  const formatTimestamp = (timestamp: Date) => {
-    return timestamp.toLocaleTimeString('fr-FR', { 
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('fr-FR', { 
       hour: '2-digit', 
       minute: '2-digit' 
     });
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="max-w-4xl mx-auto p-4">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <SparklesIcon className="h-8 w-8 text-primary-600" />
-            <h1 className="text-3xl font-bold text-gray-900">
-              Copilot IA
-            </h1>
+          <div className="inline-flex items-center space-x-3 bg-white rounded-full px-6 py-3 shadow-lg">
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+              <SparklesIcon className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Copilot IA</h1>
+              <p className="text-sm text-gray-600">Assistant Constitution de la Guinée</p>
+            </div>
           </div>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Posez vos questions sur les constitutions de la Guinée. Notre assistant IA vous aidera 
-            à trouver des informations précises et pertinentes.
-          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Chat Interface */}
-          <div className="lg:col-span-2">
-            <div className="card h-[600px] flex flex-col">
+        {/* Chat Container */}
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="h-[600px] overflow-y-auto p-6 space-y-4">
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-lg p-3 ${
-                        message.type === 'user'
-                          ? 'bg-primary-600 text-white'
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                    message.isUser
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
                           : 'bg-gray-100 text-gray-900'
                       }`}
                     >
+                  <div className="flex items-start space-x-2">
+                    {!message.isUser && (
+                      <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <SparklesIcon className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                    <div className="flex-1">
                       <p className="text-sm">{message.content}</p>
-                      
-                      {/* Sources pour les messages IA */}
-                      {message.type === 'ai' && message.sources && message.sources.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <p className="text-xs font-medium mb-2">Sources :</p>
-                          <div className="space-y-1">
-                            {message.sources.slice(0, 3).map((source, index) => (
-                              <div key={index} className="flex items-center space-x-2 text-xs">
-                                <DocumentTextIcon className="h-3 w-3" />
-                                <span>
-                                  Constitution {source.year} - {source.title}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                      {message.loading && (
+                        <div className="flex space-x-1 mt-2">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                         </div>
                       )}
-                      
-                      <p className={`text-xs mt-2 ${
-                        message.type === 'user' ? 'text-primary-100' : 'text-gray-500'
-                      }`}>
-                        {formatTimestamp(message.timestamp)}
-                      </p>
                     </div>
-                  </div>
-                ))}
-                
-                {/* Loading indicator */}
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-100 rounded-lg p-3">
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
-                        <span className="text-sm text-gray-600">IA réfléchit...</span>
+                    {message.isUser && (
+                      <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                        <UserIcon className="w-4 h-4 text-blue-600" />
                       </div>
+                    )}
                     </div>
+                  <div className={`text-xs mt-2 ${message.isUser ? 'text-blue-100' : 'text-gray-500'}`}>
+                    {formatTime(message.timestamp)}
                   </div>
-                )}
-                
+                </div>
+              </div>
+            ))}
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Input */}
-              <div className="border-t border-gray-200 p-4">
-                <form onSubmit={handleSubmit} className="flex space-x-2">
-                  <input
-                    type="text"
+          {/* Input Area */}
+          <div className="border-t border-gray-200 p-4 bg-gray-50">
+            <div className="flex items-center space-x-3">
+              <div className="flex-1 relative">
+                <textarea
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    placeholder="Posez votre question..."
-                    className="flex-1 input-field"
+                  onKeyPress={handleKeyPress}
+                  placeholder="Posez votre question sur la constitution de la Guinée..."
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  rows={1}
+                  style={{ minHeight: '48px', maxHeight: '120px' }}
                     disabled={isLoading}
                   />
                   <button
-                    type="submit"
-                    disabled={isLoading || !inputValue.trim()}
-                    className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={sendMessage}
+                  disabled={!inputValue.trim() || isLoading}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
-                    <PaperAirplaneIcon className="h-5 w-5" />
+                  {isLoading ? (
+                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <PaperAirplaneIcon className="w-4 h-4" />
+                  )}
                   </button>
-                </form>
-              </div>
             </div>
           </div>
 
-          {/* Suggestions Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="card">
-              <div className="flex items-center space-x-2 mb-4">
-                <LightBulbIcon className="h-5 w-5 text-primary-600" />
-                <h3 className="font-semibold text-gray-900">Suggestions</h3>
-              </div>
-              
-              <div className="space-y-3">
-                {suggestions.map((suggestion, index) => (
+            {/* Suggestions */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                "Combien de mandats peut faire un président ?",
+                "Quels sont les droits fondamentaux ?",
+                "Comment fonctionne le parlement ?",
+                "Quelle est la procédure d'élection ?"
+              ].map((suggestion, index) => (
                   <button
                     key={index}
-                    onClick={() => handleSuggestionClick(suggestion.text)}
-                    className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors duration-200"
+                  onClick={() => setInputValue(suggestion)}
+                  className="px-3 py-1 text-xs bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors duration-200"
                   >
-                    <div className="flex items-start space-x-2">
-                      <ChatBubbleLeftRightIcon className="h-4 w-4 text-primary-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">{suggestion.text}</span>
-                    </div>
+                  {suggestion}
                   </button>
                 ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Features */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white rounded-xl p-6 shadow-lg">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+              <ChatBubbleLeftRightIcon className="w-6 h-6 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Dialogue Intelligent</h3>
+            <p className="text-gray-600 text-sm">Posez vos questions naturellement et obtenez des réponses précises sur la constitution.</p>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">Conseils d'utilisation</h4>
-                <ul className="text-xs text-gray-600 space-y-1">
-                  <li>• Posez des questions spécifiques</li>
-                  <li>• Mentionnez l'année si nécessaire</li>
-                  <li>• Demandez des comparaisons entre versions</li>
-                  <li>• Interrogez sur les droits et obligations</li>
-                </ul>
-              </div>
+          <div className="bg-white rounded-xl p-6 shadow-lg">
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+              <SparklesIcon className="w-6 h-6 text-purple-600" />
             </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">IA Spécialisée</h3>
+            <p className="text-gray-600 text-sm">Assistant entraîné spécifiquement sur la constitution de la Guinée pour des réponses pertinentes.</p>
+              </div>
+          
+          <div className="bg-white rounded-xl p-6 shadow-lg">
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+              <ArrowPathIcon className="w-6 h-6 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Mémoire de Conversation</h3>
+            <p className="text-gray-600 text-sm">L'IA se souvient de vos échanges précédents pour des conversations cohérentes.</p>
           </div>
         </div>
       </div>

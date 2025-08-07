@@ -1,0 +1,14 @@
+# Tâches cron pour ConstitutionIA sur Ubuntu
+# À ajouter avec: crontab -e
+
+# Sauvegarde quotidienne à 2h du matin
+0 2 * * * /opt/constitutionia/backup-ubuntu.sh
+
+# Nettoyage des logs hebdomadaire (dimanche à 3h)
+0 3 * * 0 find /opt/constitutionia/logs -name "*.log" -mtime +7 -delete
+
+# Redémarrage automatique en cas de problème (toutes les 6h)
+0 */6 * * * /usr/local/bin/docker-compose -f /opt/constitutionia/docker-compose-ubuntu.yml restart
+
+# Monitoring des conteneurs (toutes les heures)
+0 * * * * /usr/local/bin/docker-compose -f /opt/constitutionia/docker-compose-ubuntu.yml ps | grep -q "Up" || /usr/local/bin/docker-compose -f /opt/constitutionia/docker-compose-ubuntu.yml up -d 

@@ -32,6 +32,13 @@ const Footer: React.FC = () => {
                 </svg>
               </a>
             </div>
+            <div className="mt-2">
+              <img 
+                src="/images/simandouguinea2.png" 
+                alt="Simandou Guinée" 
+                className="h-20 w-auto opacity-90 hover:opacity-100 transition-opacity"
+              />
+            </div>
           </div>
 
           {/* Liens rapides */}
@@ -85,22 +92,22 @@ const Footer: React.FC = () => {
         </div>
 
         {/* Section blanche avec l'image */}
-        <div className="mt-8 pt-8 border-t border-gray-300 bg-white rounded-lg p-6">
+        <div 
+          className="mt-10 pt-8 border-t border-gray-300 bg-white rounded-lg p-4" 
+          style={{
+            paddingTop: '0px',
+            paddingBottom: '0px'
+          }}
+        >
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-600 text-sm">
-              © 2024 ConstitutionIA. Tous droits réservés.
+              © 2025 ANDE. Tous droits réservés.
             </p>
-            <div className="flex items-center space-x-6 mt-4 md:mt-0">
-              <a href="#" className="text-gray-600 hover:text-gray-900 text-sm">
-                Politique de confidentialité
-              </a>
-              <a href="#" className="text-gray-600 hover:text-gray-900 text-sm">
-                Conditions d'utilisation
-              </a>
+            <div className="flex items-center mt-4 md:mt-0">
               <img 
-                src="/images/simandouguinea.png" 
-                alt="Simandou Guinée" 
-                className="h-16 w-auto opacity-90 hover:opacity-100 transition-opacity"
+                src="/images/ANDE_TRANS.png" 
+                alt="ANDE" 
+                className="h-20 w-auto opacity-90 hover:opacity-100 transition-opacity"
               />
             </div>
           </div>

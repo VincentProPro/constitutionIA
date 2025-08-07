@@ -65,16 +65,18 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose }) => {
     setInputText('');
     setIsLoading(true);
 
+    const startTime = Date.now();
+
     try {
-      const response = await fetch('http://localhost:8000/api/ai/chat/pdf', {
+      const response = await fetch('http://localhost:8000/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          question: inputText,
-          filename: filename,
-          context: 'PDF Constitution'
+          query: inputText,
+          context: 'Constitution Guinée',
+          max_results: 5
         })
       });
 
@@ -83,15 +85,30 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose }) => {
       }
 
       const data = await response.json();
+      const backendTime = Math.round((data.search_time || 0) * 1000); // Convertir en ms
+      const totalTime = Date.now() - startTime;
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: data.response,
+        text: data.answer,
         isUser: false,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMessage]);
+      
+      // Afficher les suggestions si disponibles
+      if (data.suggestions && data.suggestions.length > 0) {
+        setTimeout(() => {
+          const suggestionsMessage: Message = {
+            id: (Date.now() + 3).toString(),
+            text: `💡 Suggestions: ${data.suggestions.join(', ')}`,
+            isUser: false,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, suggestionsMessage]);
+        }, 1000);
+      }
     } catch (error) {
       console.error('Erreur:', error);
       const errorMessage: Message = {
@@ -129,15 +146,15 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose }) => {
       setIsLoading(true);
       
       // Appeler l'API
-      fetch('http://localhost:8000/api/ai/chat/pdf', {
+      fetch('http://localhost:8000/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          question: question,
-          filename: filename,
-          context: 'PDF Constitution'
+          query: question,
+          context: 'Constitution Guinée',
+          max_results: 5
         })
       })
       .then(response => {
@@ -149,7 +166,7 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose }) => {
       .then(data => {
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: data.response,
+          text: data.answer,
           isUser: false,
           timestamp: new Date()
         };
@@ -196,14 +213,22 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose }) => {
         <div className="flex items-center space-x-2">
           <ChatBubbleLeftRightIcon className="w-5 h-5" />
           <span className="font-semibold">Assistant IA</span>
-          <span className="text-xs bg-red-500 px-2 py-1 rounded">VISIBLE</span>
+          <div className="flex items-center space-x-1">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <span className="text-xs">Optimisé</span>
+          </div>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-blue-700 rounded-full transition-colors"
-        >
-          <XMarkIcon className="w-5 h-5" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <div className="text-xs bg-blue-700 px-2 py-1 rounded">
+            Cache: {messages.length > 0 ? 'Actif' : 'Prêt'}
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-blue-700 rounded-full transition-colors"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}

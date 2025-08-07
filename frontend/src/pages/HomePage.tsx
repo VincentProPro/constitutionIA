@@ -2,12 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ChevronLeftIcon, 
-  ChevronRightIcon,
-  PlayIcon,
-  DocumentTextIcon,
-  LightBulbIcon,
-  UserGroupIcon,
-  GlobeAltIcon
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import Footer from '../components/Footer.js';
 import Header from '../components/Header.js';
@@ -41,7 +36,7 @@ const HomePage: React.FC = () => {
       title: "ConstitutionIA",
       subtitle: "Plateforme de gestion des constitutions",
       description: "Accédez facilement aux constitutions de la Guinée et interrogez notre assistant IA",
-      image: "/images/slider/slide-1.jpg",
+      image: "/images/slider/slide-7.jpg",
       cta: "Explorer les Constitutions"
     },
     {
@@ -53,12 +48,21 @@ const HomePage: React.FC = () => {
       cta: "Tester le Copilot"
     },
     {
-      id: 3,
-      title: "Recherche Avancée",
-      subtitle: "Trouvez rapidement",
-      description: "Recherchez dans le contenu des constitutions avec des filtres précis",
-      image: "/images/slider/slide-3.jpg",
-      cta: "Rechercher"
+      id: 2,
+      title: "OUI",
+      subtitle: "À LA NOUVELLE CONSTITUTION",
+      description: "Découvrez la nouvelle Constitution guinéenne",
+      image: "/images/slider/slide-5.jpg",
+      cta: "Tester le Copilot"
+    },
+  
+    {
+      id: 4,
+      title: "Analyse Intelligente",
+      subtitle: "Compréhension approfondie",
+      description: "Analysez les constitutions avec des outils d'IA avancés pour une meilleure compréhension",
+      image: "/images/slider/slide-4.jpg",
+      cta: "Analyser"
     }
   ];
 
@@ -101,25 +105,30 @@ const HomePage: React.FC = () => {
             }`}
           >
             <div 
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${slide.image})` }}
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+              style={{ 
+                backgroundImage: `url(${slide.image})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+              }}
             >
               <div className="absolute inset-0 bg-black bg-opacity-50"></div>
             </div>
-            <div className="relative h-full flex items-center justify-center">
-              <div className="text-center text-white max-w-4xl mx-auto px-4">
-                <h1 className="text-5xl md:text-7xl font-bold mb-4">
+            <div className="relative h-full flex items-center justify-center px-4">
+              <div className="text-center text-white max-w-4xl mx-auto">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-2 md:mb-4">
                   {slide.title}
                 </h1>
-                <h2 className="text-2xl md:text-3xl font-semibold mb-4 text-blue-200">
+                <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold mb-2 md:mb-4 text-blue-200">
                   {slide.subtitle}
                 </h2>
-                <p className="text-lg md:text-xl mb-8 text-gray-200">
+                <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-4 md:mb-8 text-gray-200 leading-relaxed">
                   {slide.description}
                 </p>
                 <Link
                   to={slide.cta.includes("Copilot") ? "/ai-copilot" : "/constitutions"}
-                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors duration-200"
+                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 md:px-8 py-2 sm:py-3 rounded-lg font-semibold transition-colors duration-200 text-sm sm:text-base"
                 >
                   {slide.cta}
                 </Link>
@@ -131,24 +140,24 @@ const HomePage: React.FC = () => {
         {/* Navigation arrows */}
         <button
           onClick={prevSlide}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white p-2 rounded-full transition-all duration-200"
+          className="absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white p-1 sm:p-2 rounded-full transition-all duration-200 z-10"
         >
-          <ChevronLeftIcon className="w-6 h-6" />
+          <ChevronLeftIcon className="w-4 h-4 sm:w-6 sm:h-6" />
         </button>
         <button
           onClick={nextSlide}
-          className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white p-2 rounded-full transition-all duration-200"
+          className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white p-1 sm:p-2 rounded-full transition-all duration-200 z-10"
         >
-          <ChevronRightIcon className="w-6 h-6" />
+          <ChevronRightIcon className="w-4 h-4 sm:w-6 sm:h-6" />
         </button>
 
         {/* Dots indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2">
+        <div className="absolute bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-1 sm:space-x-2 z-10">
           {sliderData.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentSlide(index)}
-              className={`w-3 h-3 rounded-full transition-all duration-200 ${
+              className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-200 ${
                 index === currentSlide ? 'bg-white' : 'bg-white bg-opacity-50'
               }`}
             />
@@ -167,8 +176,7 @@ const HomePage: React.FC = () => {
               <div className="w-24 h-1 bg-blue-600 mb-6"></div>
               
               <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                ConstitutionIA est une plateforme innovante dédiée à la démocratisation de l'accès 
-                aux constitutions de la Guinée.
+                ConstitutionIA est une plateforme intelligente conçue pour faciliter la compréhension et la vulgarisation de la Constitution guinéenne, en la rendant accessible, claire et interactive pour tous les citoyens.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
@@ -220,18 +228,11 @@ const HomePage: React.FC = () => {
               <div className="w-24 h-1 bg-blue-600 mb-6"></div>
               
               <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                ConstitutionIA s'inscrit dans la vision ambitieuse de la Guinée pour 2040, 
-                portée par le projet Simandou. Notre plateforme contribue à cette transformation 
-                en démocratisant l'accès aux informations constitutionnelles et en favorisant 
-                la transparence démocratique.
+              ConstitutionIA est une IA conçue pour rendre la Constitution guinéenne compréhensible et accessible à tous, en facilitant l’accès aux droits et devoirs citoyens.              
               </p>
               
               <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                À travers l'intelligence artificielle et l'innovation technologique, 
-                nous participons à la modernisation de l'État guinéen et à l'émergence 
-                d'une société numérique inclusive, alignée sur les objectifs de développement 
-                durable de la Vision Simandou 2040.
-              </p>
+              Elle s’inscrit dans la vision Simandou 2040 en promouvant une gouvernance inclusive, la transparence et une participation citoyenne active au service d’un développement durable.              </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
@@ -246,12 +247,12 @@ const HomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* Mot du Directeur Général Section */}
+      {/* Mot du Président Section */}
       <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
                           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-                Mot du Directeur Général
+                Mot du Président
               </h2>
               <div className="w-24 h-1 bg-blue-600 mx-auto"></div>
           </div>
@@ -261,15 +262,15 @@ const HomePage: React.FC = () => {
               <div className="flex flex-col md:flex-row items-center mb-8">
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden shadow-lg mb-6 md:mb-0 md:mr-8">
                   <img
-                    src="/images/dg.jpg"
-                    alt="Directeur Général"
+                    src="/images/Dr-Dansa-Kourouma.jpg"
+                    alt="Président"
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="text-center md:text-left">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Mamadou Diallo</h3>
-                  <p className="text-blue-600 font-semibold text-lg">Directeur Général</p>
-                  <p className="text-gray-600 mt-2">ConstitutionIA</p>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Dr Dansa KOUROUMA</h3>
+                  <p className="text-blue-600 font-semibold text-lg">Président</p>
+                  <p className="text-gray-600 mt-2">Conseil National de la Transition GN</p>
                 </div>
               </div>
               
@@ -278,20 +279,11 @@ const HomePage: React.FC = () => {
                   "Chers citoyens, chers utilisateurs,
                 </p>
                 <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                  ConstitutionIA représente une étape majeure dans notre engagement en faveur de la 
-                  transparence et de l'accessibilité des informations constitutionnelles. Cette plateforme 
-                  innovante témoigne de notre volonté de moderniser l'accès aux documents fondamentaux 
-                  de notre République.
+                ConstitutionIA marque une avancée majeure vers une citoyenneté éclairée et active. En rendant notre Loi fondamentale accessible à tous, elle concrétise notre vision d’une Guinée plus juste, inclusive et tournée vers l’avenir. 
+               
                 </p>
-                <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                  Notre mission est de rendre les constitutions plus compréhensibles et accessibles 
-                  à tous les Guinéens. Grâce à l'intelligence artificielle, nous offrons un outil 
-                  puissant qui facilite la recherche et l'analyse des textes constitutionnels.
-                </p>
-                <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                  Je vous invite à explorer cette plateforme et à découvrir les nouvelles possibilités 
-                  qu'elle offre pour mieux comprendre notre cadre constitutionnel.
-                </p>
+             
+              
                 <p className="text-lg text-gray-700 mt-8 font-semibold">
                   Ensemble, construisons une Guinée plus transparente et démocratique."
                 </p>

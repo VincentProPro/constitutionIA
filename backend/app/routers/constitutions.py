@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
+import shutil
 from pathlib import Path
 from app.database import get_db
 from app.schemas.constitution import Constitution, ConstitutionCreate, ConstitutionUpdate, ConstitutionSearch
@@ -213,7 +214,7 @@ async def head_constitution_file(filename: str):
 
 @router.post("/analyze-files")
 async def analyze_new_files(db: Session = Depends(get_db)):
-    """Déclenche l'analyse des nouveaux fichiers PDF"""
+    """Déclenche l'analyse des fichiers PDF"""
     try:
         print("Début de l'analyse des fichiers")
         
@@ -229,8 +230,20 @@ async def analyze_new_files(db: Session = Depends(get_db)):
         
         print("FileWatcher initialisé")
         
-        # Traiter les nouveaux fichiers
-        processed_files = file_watcher.process_all_new_files(db)
+        # Traiter tous les fichiers PDF dans le dossier
+        files_dir = Path("Fichier")
+        processed_files = []
+        
+        if files_dir.exists():
+            for pdf_file in files_dir.glob("*.pdf"):
+                try:
+                    print(f"Traitement du fichier: {pdf_file.name}")
+                    constitution = file_watcher.force_reprocess_file(pdf_file.name, db)
+                    if constitution:
+                        processed_files.append(constitution)
+                        print(f"Fichier retraité avec succès: {pdf_file.name}")
+                except Exception as e:
+                    print(f"Erreur lors du traitement de {pdf_file.name}: {e}")
         
         print(f"Fichiers traités: {len(processed_files)}")
         
@@ -307,3 +320,100 @@ async def get_constitutions_from_db(
     
     constitutions = query.offset(skip).limit(limit).all()
     return constitutions 
+
+@router.delete("/files/{filename}")
+async def delete_constitution_file(filename: str, db: Session = Depends(get_db)):
+    """Supprimer un fichier de constitution"""
+    try:
+        # Vérifier que le fichier existe
+        file_path = Path("Fichier") / filename
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Fichier non trouvé")
+        
+        # Supprimer l'entrée de la base de données
+        constitution = db.query(ConstitutionModel).filter(
+            ConstitutionModel.filename == filename
+        ).first()
+        
+        if constitution:
+            db.delete(constitution)
+            db.commit()
+        
+        # Supprimer le fichier physique
+        file_path.unlink()
+        
+        return {
+            "message": f"Fichier {filename} supprimé avec succès",
+            "filename": filename
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la suppression: {str(e)}")
+
+@router.post("/upload")
+async def upload_constitution_file(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Uploader un fichier PDF de constitution"""
+    try:
+        # Vérifier le type de fichier
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Seuls les fichiers PDF sont acceptés")
+        
+        # Vérifier la taille du fichier (max 10MB)
+        if file.size and file.size > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Le fichier est trop volumineux. Taille maximale : 10MB")
+        
+        # Créer le dossier Fichier s'il n'existe pas
+        upload_dir = Path("Fichier")
+        upload_dir.mkdir(exist_ok=True)
+        
+        # Générer un nom de fichier unique
+        filename = file.filename
+        file_path = upload_dir / filename
+        
+        # Vérifier si le fichier existe déjà
+        counter = 1
+        while file_path.exists():
+            name, ext = os.path.splitext(filename)
+            filename = f"{name}_{counter}{ext}"
+            file_path = upload_dir / filename
+            counter += 1
+        
+        # Sauvegarder le fichier
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Créer une entrée simple dans la base de données
+        new_constitution = ConstitutionModel(
+            filename=filename,
+            title=filename.replace('.pdf', ''),
+            description='',
+            year=None,
+            country="Guinée",
+            status=ConstitutionStatus.ACTIVE,
+            content='',
+            summary='',
+            key_topics='',
+            file_path=str(file_path),
+            file_size=file_path.stat().st_size,
+            is_active=True
+        )
+        
+        db.add(new_constitution)
+        db.commit()
+        db.refresh(new_constitution)
+        
+        return {
+            "message": f"Fichier {filename} uploadé et analysé avec succès",
+            "filename": filename,
+            "constitution": new_constitution
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'upload: {str(e)}") 

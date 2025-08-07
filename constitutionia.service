@@ -1,0 +1,15 @@
+[Unit]
+Description=ConstitutionIA Application
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/constitutionia
+ExecStart=/usr/local/bin/docker-compose -f docker-compose-ubuntu.yml up -d
+ExecStop=/usr/local/bin/docker-compose -f docker-compose-ubuntu.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target 

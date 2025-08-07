@@ -1,0 +1,25 @@
+# Règles UFW pour ConstitutionIA
+# À exécuter sur Ubuntu
+
+# Activer UFW
+sudo ufw --force enable
+
+# Autoriser SSH (important!)
+sudo ufw allow ssh
+
+# Autoriser HTTP
+sudo ufw allow 80/tcp
+
+# Autoriser HTTPS
+sudo ufw allow 443/tcp
+
+# Autoriser l'API (optionnel)
+sudo ufw allow 8000/tcp
+
+# Vérifier le statut
+sudo ufw status
+
+# Règles recommandées pour la production :
+# - Bloquer tous les ports par défaut
+# - Autoriser seulement SSH, HTTP, HTTPS
+# - Optionnel : autoriser le port 8000 pour l'API directe 
