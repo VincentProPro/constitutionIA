@@ -42,7 +42,7 @@ const AICopilotPage: React.FC = () => {
   useEffect(() => {
     const createSession = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/ai/session/create', {
+        const response = await fetch('/api/ai/session/create', {
           method: 'POST'
         });
         if (response.ok) {
@@ -80,7 +80,7 @@ const AICopilotPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/ai/chat', {
+      const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

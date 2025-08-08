@@ -29,6 +29,14 @@ const HomePage: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Fonction pour obtenir l'image appropriée selon la taille d'écran
+  const getSliderImage = (slideNumber: number, isMobile: boolean = false) => {
+    if (isMobile) {
+      return `/images/slider-mobile/slide-${slideNumber}.jpg`;
+    }
+    return `/images/slider/slide-${slideNumber}-optimized.jpg`;
+  };
+
   // Données du slider avec des images locales
   const sliderData = [
     {
@@ -36,7 +44,7 @@ const HomePage: React.FC = () => {
       title: "ConstitutionIA",
       subtitle: "Plateforme de gestion des constitutions",
       description: "Accédez facilement aux constitutions de la Guinée et interrogez notre assistant IA",
-      image: "/images/slider/slide-7.jpg",
+      slideNumber: 1, // Changé de 7 à 1 car slide-1.jpg existe
       cta: "Explorer les Constitutions"
     },
     {
@@ -44,24 +52,23 @@ const HomePage: React.FC = () => {
       title: "Votre Assistant IA",
       subtitle: "Assistant intelligent",
       description: "Posez vos questions à notre IA spécialisée dans les constitutions",
-      image: "/images/slider/slide-2.jpg",
+      slideNumber: 2,
       cta: "Commencer"
     },
     {
-      id: 2,
+      id: 3,
       title: "OUI",
       subtitle: "À LA NOUVELLE CONSTITUTION",
       description: "Découvrez la nouvelle Constitution guinéenne",
-      image: "/images/slider/slide-5.jpg",
+      slideNumber: 5,
       cta: "Découvrir"
     },
-  
     {
       id: 4,
       title: "Analyse Intelligente",
       subtitle: "Compréhension approfondie",
       description: "Analysez les constitutions avec des outils d'IA avancés pour une meilleure compréhension",
-      image: "/images/slider/slide-4.jpg",
+      slideNumber: 4,
       cta: "Analyser"
     }
   ];
@@ -104,15 +111,30 @@ const HomePage: React.FC = () => {
               index === currentSlide ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            <div 
-              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-              style={{ 
-                backgroundImage: `url(${slide.image})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat'
-              }}
-            >
+            <div className="absolute inset-0">
+              {/* Image responsive avec picture element */}
+              <picture className="w-full h-full">
+                {/* Image mobile */}
+                <source
+                  media="(max-width: 768px)"
+                  srcSet={getSliderImage(slide.slideNumber, true)}
+                />
+                {/* Image desktop */}
+                <source
+                  media="(min-width: 769px)"
+                  srcSet={getSliderImage(slide.slideNumber, false)}
+                />
+                {/* Image par défaut */}
+                <img
+                  src={getSliderImage(slide.slideNumber, false)}
+                  alt={slide.title}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </picture>
+              {/* Preload des images pour améliorer les performances */}
+              <link rel="preload" as="image" href={getSliderImage(slide.slideNumber, true)} media="(max-width: 768px)" />
+              <link rel="preload" as="image" href={getSliderImage(slide.slideNumber, false)} media="(min-width: 769px)" />
               <div className="absolute inset-0 bg-black bg-opacity-50"></div>
             </div>
             <div className="relative h-full flex items-center justify-center px-4">
@@ -127,7 +149,7 @@ const HomePage: React.FC = () => {
                   {slide.description}
                 </p>
                 <Link
-                  to={slide.cta.includes("Copilot") ? "/ai-copilot" : "/constitutions"}
+                  to="/constitutions"
                   className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 md:px-8 py-2 sm:py-3 rounded-lg font-semibold transition-colors duration-200 text-sm sm:text-base"
                 >
                   {slide.cta}
@@ -236,10 +258,10 @@ const HomePage: React.FC = () => {
               
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
-                  to="/ai-copilot"
+                  to="/constitutions"
                   className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors duration-200 text-center"
                 >
-                  Discuter avec l'IA
+                  Explorer les Constitutions
                 </Link>
               </div>
             </div>

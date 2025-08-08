@@ -164,21 +164,18 @@ async def list_constitution_files():
 @router.get("/files/{filename}")
 async def get_constitution_file(filename: str):
     """Télécharger un fichier PDF de constitution"""
-    file_path = Path("Fichier") / filename
+    import os
+    current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    file_path = Path(current_dir) / "Fichier" / filename
     
     if not file_path.exists() or not filename.endswith('.pdf'):
         raise HTTPException(status_code=404, detail="Fichier non trouvé")
     
-    from fastapi.responses import Response
-    from fastapi import Response as FastAPIResponse
+    from fastapi.responses import FileResponse
     
-    # Lire le fichier
-    with open(file_path, "rb") as f:
-        content = f.read()
-    
-    # Créer une réponse avec les headers CORS appropriés
-    response = Response(
-        content=content,
+    # Utiliser FileResponse qui gère correctement les fichiers binaires
+    return FileResponse(
+        path=file_path,
         media_type='application/pdf',
         headers={
             "Access-Control-Allow-Origin": "*",
@@ -187,18 +184,21 @@ async def get_constitution_file(filename: str):
             "Content-Disposition": f"inline; filename={filename}"
         }
     )
-    
-    return response
 
 @router.head("/files/{filename}")
 async def head_constitution_file(filename: str):
     """Gérer les requêtes HEAD pour CORS"""
-    file_path = Path("Fichier") / filename
+    import os
+    current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    file_path = Path(current_dir) / "Fichier" / filename
     
     if not file_path.exists() or not filename.endswith('.pdf'):
         raise HTTPException(status_code=404, detail="Fichier non trouvé")
     
     from fastapi.responses import Response
+    
+    # Lire la taille du fichier pour le Content-Length
+    file_size = file_path.stat().st_size
     
     # Retourner une réponse HEAD avec les headers CORS
     return Response(
@@ -208,7 +208,8 @@ async def head_constitution_file(filename: str):
             "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
             "Access-Control-Allow-Headers": "*",
             "Content-Type": "application/pdf",
-            "Content-Disposition": f"inline; filename={filename}"
+            "Content-Disposition": f"inline; filename={filename}",
+            "Content-Length": str(file_size)
         }
     )
 

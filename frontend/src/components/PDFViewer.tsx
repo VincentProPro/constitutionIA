@@ -10,7 +10,7 @@ interface PDFViewerProps {
 const PDFViewer: React.FC<PDFViewerProps> = ({ filename, isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
 
-  const pdfUrl = `http://localhost:8000/api/constitutions/files/${encodeURIComponent(filename)}`;
+  const pdfUrl = `/api/constitutions/files/${encodeURIComponent(filename)}`;
 
   useEffect(() => {
     if (isOpen) {
@@ -36,65 +36,74 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ filename, isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl w-full h-full max-w-6xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-2xl w-full h-full max-w-6xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center space-x-4">
-            <h2 className="text-xl font-semibold text-gray-900">
+        <div className="flex items-start sm:items-center justify-between p-3 sm:p-4 border-b border-gray-200">
+          <div className="flex items-start sm:items-center space-x-2 sm:space-x-4 flex-1 min-w-0">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 break-words leading-tight">
               {filename}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-1 sm:p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0 ml-2 sm:ml-0"
           >
-            <XMarkIcon className="w-6 h-6 text-gray-500" />
+            <XMarkIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500" />
           </button>
         </div>
 
         {/* PDF Content */}
         <div className="flex-1 relative overflow-hidden">
-          <div className="flex items-center justify-center h-full bg-gray-50">
-            <div className="text-center max-w-md">
-              <DocumentTextIcon className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {filename}
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Le PDF sera ouvert dans un nouvel onglet pour une meilleure expérience de lecture.
-              </p>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => window.open(pdfUrl, '_blank')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                >
-                  Ouvrir le PDF
-                </button>
-                <button
-                  onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = pdfUrl;
-                    link.download = filename;
-                    link.click();
-                  }}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-medium transition-colors"
-                >
-                  Télécharger
-                </button>
+          {loading ? (
+            <div className="flex items-center justify-center h-full bg-gray-50">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Chargement du PDF...</p>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-center h-full bg-gray-50 p-4">
+              <div className="text-center max-w-sm sm:max-w-md">
+                <DocumentTextIcon className="h-12 w-12 sm:h-16 sm:w-16 text-blue-600 mx-auto mb-3 sm:mb-4" />
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 break-words leading-tight">
+                  {filename}
+                </h3>
+                <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
+                  Le PDF est maintenant correctement servi. Utilisez les boutons ci-dessous pour l'ouvrir ou le télécharger.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 sm:space-x-3">
+                  <button
+                    onClick={() => window.open(pdfUrl, '_blank')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base"
+                  >
+                    Ouvrir le PDF
+                  </button>
+                  <button
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = pdfUrl;
+                      link.download = filename;
+                      link.click();
+                    }}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 sm:px-6 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base"
+                  >
+                    Télécharger
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
 
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex space-x-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between p-3 sm:p-4 border-t border-gray-200 bg-gray-50 gap-2 sm:gap-0">
+          <div className="flex flex-col sm:flex-row gap-2 sm:space-x-4">
             <button
               onClick={() => window.open(pdfUrl, '_blank')}
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium"
             >
               Ouvrir dans un nouvel onglet
             </button>
@@ -105,12 +114,12 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ filename, isOpen, onClose }) => {
                 link.download = filename;
                 link.click();
               }}
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium"
             >
               Télécharger
             </button>
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-xs sm:text-sm text-gray-500">
             Appuyez sur Échap pour fermer
           </div>
         </div>

@@ -26,7 +26,7 @@ const Header: React.FC = () => {
     const fetchConstitutions = async () => {
       setLoading(true);
       try {
-        const response = await fetch('http://localhost:8000/api/constitutions/db/list');
+        const response = await fetch('/api/constitutions/');
         if (response.ok) {
           const data = await response.json();
           setConstitutions(data);
@@ -77,7 +77,7 @@ const Header: React.FC = () => {
               <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">C</span>
               </div>
-              <span className="text-xl font-bold text-gray-900">ConstitutionIA</span>
+              <span className="text-lg sm:text-xl font-bold text-gray-900">ConstitutionIA</span>
             </Link>
           </div>
 
@@ -173,7 +173,7 @@ const Header: React.FC = () => {
         {/* Mobile menu */}
         {isMenuOpen && (
           <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 max-h-[70vh] overflow-y-auto">
               {navigation.map((item) => (
                 <Link
                   key={item.name}

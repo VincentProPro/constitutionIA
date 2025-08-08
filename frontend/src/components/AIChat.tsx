@@ -70,7 +70,7 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
     const startTime = Date.now();
 
     try {
-      const response = await fetch('http://localhost:8000/api/ai/chat', {
+      const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -148,7 +148,7 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
       setIsLoading(true);
       
       // Appeler l'API
-      fetch('http://localhost:8000/api/ai/chat', {
+              fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -205,23 +205,23 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
   return (
     <div className="w-full h-full flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-            <ChatBubbleLeftRightIcon className="w-5 h-5" />
+      <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-white/20 rounded-full flex items-center justify-center">
+            <ChatBubbleLeftRightIcon className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div>
-            <span className="font-semibold text-lg">Assistant IA</span>
-            <div className="flex items-center space-x-2 mt-1">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <span className="font-semibold text-sm sm:text-lg">Assistant IA</span>
+            <div className="flex items-center space-x-1 sm:space-x-2 mt-1">
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full animate-pulse"></div>
               <span className="text-xs opacity-90">Optimisé</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <button
             onClick={handleToggleExpanded}
-            className="flex items-center space-x-2 text-xs bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm hover:bg-white/30 transition-all duration-200"
+            className="flex items-center space-x-1 sm:space-x-2 text-xs bg-white/20 px-2 sm:px-3 py-1 rounded-full backdrop-blur-sm hover:bg-white/30 transition-all duration-200"
             title={isExpanded ? "Réduire le popup" : "Agrandir le popup"}
           >
             {isExpanded ? (
@@ -229,23 +229,23 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
             ) : (
               <ArrowsPointingOutIcon className="w-3 h-3" />
             )}
-            <span>{isExpanded ? 'Réduire' : 'Agrandir'}</span>
+            <span className="hidden sm:inline">{isExpanded ? 'Réduire' : 'Agrandir'}</span>
           </button>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-full transition-all duration-200 hover:scale-110"
+            className="p-1 sm:p-2 hover:bg-white/20 rounded-full transition-all duration-200 hover:scale-110"
           >
-            <XMarkIcon className="w-5 h-5" />
+            <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-gray-50">
         {messages.length === 0 && !isOpen && (
-          <div className="text-center text-gray-500 py-8">
-            <ChatBubbleLeftRightIcon className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-            <p className="text-sm">Posez vos questions sur le fichier PDF</p>
+          <div className="text-center text-gray-500 py-6 sm:py-8">
+            <ChatBubbleLeftRightIcon className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-2 text-gray-300" />
+            <p className="text-xs sm:text-sm">Posez vos questions sur le fichier PDF</p>
             <p className="text-xs mt-1">"{filename}"</p>
           </div>
         )}
@@ -256,14 +256,14 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
             className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
+              className={`max-w-[85%] sm:max-w-xs lg:max-w-md px-3 sm:px-4 py-2 sm:py-3 rounded-2xl shadow-sm ${
                 message.isUser
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-800 border border-gray-200'
               }`}
             >
-              <p className="text-sm leading-relaxed">{message.text}</p>
-              <p className={`text-xs mt-2 ${
+              <p className="text-xs sm:text-sm leading-relaxed">{message.text}</p>
+              <p className={`text-xs mt-1 sm:mt-2 ${
                 message.isUser ? 'text-blue-100' : 'text-gray-500'
               }`}>
                 {message.timestamp.toLocaleTimeString()}
@@ -274,14 +274,14 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
         
         {/* Suggestions de questions après le message de bienvenue */}
         {messages.length === 1 && messages[0].id === 'welcome' && (
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600 font-medium">💡 Suggestions de questions :</p>
+          <div className="space-y-2 sm:space-y-3">
+            <p className="text-xs sm:text-sm text-gray-600 font-medium">💡 Suggestions de questions :</p>
             <div className="grid grid-cols-1 gap-2">
               {suggestedQuestions.map((question, index) => (
                 <button
                   key={index}
                   onClick={() => handleSuggestedQuestion(question)}
-                  className="text-sm bg-white hover:bg-blue-50 text-blue-700 px-4 py-3 rounded-xl border border-blue-200 transition-all duration-200 hover:border-blue-300 hover:shadow-sm text-left"
+                  className="text-xs sm:text-sm bg-white hover:bg-blue-50 text-blue-700 px-3 sm:px-4 py-2 sm:py-3 rounded-xl border border-blue-200 transition-all duration-200 hover:border-blue-300 hover:shadow-sm text-left"
                 >
                   {question}
                 </button>
@@ -292,10 +292,10 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
         
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-white text-gray-800 px-4 py-3 rounded-2xl border border-gray-200 shadow-sm">
-              <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
-                <span className="text-sm">L'assistant réfléchit...</span>
+            <div className="bg-white text-gray-800 px-3 sm:px-4 py-2 sm:py-3 rounded-2xl border border-gray-200 shadow-sm">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-2 border-blue-600 border-t-transparent"></div>
+                <span className="text-xs sm:text-sm">L'assistant réfléchit...</span>
               </div>
             </div>
           </div>
@@ -305,23 +305,23 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-200 bg-white">
-        <div className="flex space-x-3">
+      <div className="p-3 sm:p-4 border-t border-gray-200 bg-white">
+        <div className="flex space-x-2 sm:space-x-3">
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Posez votre question..."
-            className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs sm:text-sm"
             disabled={isLoading}
           />
           <button
             onClick={sendMessage}
             disabled={!inputText.trim() || isLoading}
-            className="px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 shadow-sm"
+            className="px-3 sm:px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 shadow-sm"
           >
-            <PaperAirplaneIcon className="w-5 h-5" />
+            <PaperAirplaneIcon className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>

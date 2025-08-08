@@ -45,7 +45,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Configuration axios
-  axios.defaults.baseURL = 'http://localhost:8000';
+      axios.defaults.baseURL = '';
 
   useEffect(() => {
     if (token) {

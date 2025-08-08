@@ -528,3 +528,31 @@ async def get_sessions_stats():
         "temporary_users": temp_users,
         "active_sessions": len(ai_service.session_timestamps)
     } 
+
+@router.post("/init-rag")
+async def initialize_rag():
+    """Force l'initialisation du système RAG"""
+    try:
+        ai_service = get_optimized_ai_service()
+        
+        # Forcer l'initialisation
+        success = ai_service._initialize_rag_lazy()
+        
+        if success:
+            return {
+                "success": True,
+                "message": "Système RAG initialisé avec succès",
+                "status": ai_service.get_system_status()
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Échec de l'initialisation du RAG",
+                "status": ai_service.get_system_status()
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Erreur lors de l'initialisation: {str(e)}",
+            "error": str(e)
+        } 

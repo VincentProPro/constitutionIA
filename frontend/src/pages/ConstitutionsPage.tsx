@@ -83,7 +83,7 @@ const ConstitutionsPage: React.FC = () => {
     console.log('ConstitutionsPage - fetchConstitutions - Début');
     try {
       console.log('ConstitutionsPage - fetchConstitutions - Appel API');
-      const response = await axios.get('http://localhost:8000/api/constitutions/db/list');
+      const response = await axios.get('/api/constitutions/');
       console.log('ConstitutionsPage - fetchConstitutions - Réponse complète:', response);
       console.log('ConstitutionsPage - fetchConstitutions - Données:', response.data);
       console.log('ConstitutionsPage - fetchConstitutions - Type de données:', typeof response.data);
@@ -110,7 +110,7 @@ const ConstitutionsPage: React.FC = () => {
   const handleAnalyzeFiles = async () => {
     setAnalyzing(true);
     try {
-      const response = await axios.post('http://localhost:8000/api/constitutions/analyze-files');
+      const response = await axios.post('/api/constitutions/analyze-files');
       showSuccess('Analyse terminée', 'Les fichiers ont été analysés avec succès.');
       await fetchConstitutions(); // Recharger les constitutions
     } catch (error) {
@@ -137,7 +137,7 @@ const ConstitutionsPage: React.FC = () => {
     formData.append('file', file);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/constitutions/upload', formData, {
+      const response = await axios.post('/api/constitutions/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -164,7 +164,7 @@ const ConstitutionsPage: React.FC = () => {
   const handleDeleteConstitution = async (constitution: Constitution) => {
     setDeleting(true);
     try {
-      await axios.delete(`http://localhost:8000/api/constitutions/${constitution.id}`);
+              await axios.delete(`/api/constitutions/${constitution.id}`);
       showSuccess('Constitution supprimée', 'La constitution a été supprimée avec succès.');
       setShowDeleteModal(false);
       setDeletingConstitution(null);
@@ -181,7 +181,7 @@ const ConstitutionsPage: React.FC = () => {
     if (!editingConstitution) return;
 
     try {
-      await axios.put(`http://localhost:8000/api/constitutions/${editingConstitution.id}`, updatedConstitution);
+              await axios.put(`/api/constitutions/${editingConstitution.id}`, updatedConstitution);
       showSuccess('Constitution mise à jour', 'La constitution a été mise à jour avec succès.');
       setShowEditModal(false);
       setEditingConstitution(null);
@@ -211,35 +211,38 @@ const ConstitutionsPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-                Constitutions de la Guinée
-              </h1>
-          <div className="flex space-x-4">
-              <button
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            Constitutions de la Guinée
+          </h1>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
+            <button
               onClick={handleAnalyzeFiles}
               disabled={analyzing}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center space-x-2 text-sm sm:text-base"
             >
               {analyzing ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Analyse en cours...</span>
+                  <span className="hidden sm:inline">Analyse en cours...</span>
+                  <span className="sm:hidden">Analyse...</span>
                 </>
               ) : (
                 <>
-                  <DocumentTextIcon className="h-5 w-5" />
-                  <span>Analyser les fichiers</span>
+                  <DocumentTextIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="hidden sm:inline">Analyser les fichiers</span>
+                  <span className="sm:hidden">Analyser</span>
                 </>
               )}
-              </button>
-              <button
+            </button>
+            <button
               onClick={() => setShowUploadModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
-              >
-              <PlusIcon className="h-5 w-5" />
-              <span>Ajouter un fichier PDF</span>
-              </button>
+              className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center space-x-2 text-sm sm:text-base"
+            >
+              <PlusIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="hidden sm:inline">Ajouter un fichier PDF</span>
+              <span className="sm:hidden">Ajouter PDF</span>
+            </button>
           </div>
         </div>
 
@@ -298,7 +301,7 @@ const ConstitutionsPage: React.FC = () => {
         </div>
 
         {/* Liste des constitutions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredConstitutions.length === 0 ? (
             <div className="col-span-full text-center py-8">
               <DocumentTextIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -306,13 +309,13 @@ const ConstitutionsPage: React.FC = () => {
             </div>
           ) : (
             filteredConstitutions.map((constitution) => (
-              <div key={constitution.id} className="bg-white rounded-lg shadow-md p-6 flex flex-col min-h-[280px]">
+              <div key={constitution.id} className="bg-white rounded-lg shadow-md p-4 sm:p-6 flex flex-col min-h-[240px] sm:min-h-[280px]">
                 {/* Header avec titre et boutons d'action */}
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xl font-bold text-gray-900 flex-1 pr-2 line-clamp-2">
+                <div className="flex justify-between items-start mb-3 sm:mb-4">
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 flex-1 pr-2 line-clamp-2">
                     {constitution.title}
                   </h3>
-                  <div className="flex space-x-2 flex-shrink-0 ml-2">
+                  <div className="flex space-x-1 sm:space-x-2 flex-shrink-0 ml-2">
                     <button
                       onClick={() => {
                         setEditingConstitution(constitution);
@@ -320,7 +323,7 @@ const ConstitutionsPage: React.FC = () => {
                       }}
                       className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
                     >
-                      <PencilIcon className="h-5 w-5" />
+                      <PencilIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                     </button>
                     <button
                       onClick={() => {
@@ -329,21 +332,21 @@ const ConstitutionsPage: React.FC = () => {
                       }}
                       className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
                     >
-                      <TrashIcon className="h-5 w-5" />
+                      <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                     </button>
                   </div>
                 </div>
 
                 {/* Contenu principal - prend l'espace disponible */}
-                <div className="flex-1 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-gray-600">
+                <div className="flex-1 space-y-2 sm:space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
+                    <p className="text-sm sm:text-base text-gray-600">
                       <span className="font-medium">Année:</span> {constitution.year || 'Non spécifiée'}
                     </p>
                   </div>
                   
-                  <div className="flex items-center justify-between">
-                    <p className="text-gray-600">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
+                    <p className="text-sm sm:text-base text-gray-600">
                       <span className="font-medium">Statut:</span> 
                       <span className={`ml-1 px-2 py-1 text-xs rounded-full ${
                         constitution.status === 'active' ? 'bg-green-100 text-green-800' :
@@ -361,31 +364,31 @@ const ConstitutionsPage: React.FC = () => {
                     </p>
                   </div>
                   
-                  <div className="text-sm text-gray-500 truncate">
+                  <div className="text-xs sm:text-sm text-gray-500 break-words">
                     <span className="font-medium">Fichier:</span> {constitution.filename}
                   </div>
                 </div>
 
                 {/* Boutons toujours alignés en bas */}
-                <div className="mt-6 flex space-x-2 pt-4 border-t border-gray-100">
+                <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-2 sm:space-x-2 pt-3 sm:pt-4 border-t border-gray-100">
                   <button 
                     onClick={() => navigate(`/pdf/${encodeURIComponent(constitution.filename)}`)}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm flex items-center justify-center space-x-1 transition-colors"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm flex items-center justify-center space-x-1 transition-colors"
                   >
-                    <EyeIcon className="h-4 w-4" />
+                    <EyeIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Voir</span>
                   </button>
                   <button 
                     onClick={() => {
                       // Télécharger le fichier
                       const link = document.createElement('a');
-                      link.href = `http://localhost:8000/api/constitutions/download/${encodeURIComponent(constitution.filename)}`;
+                      link.href = `/api/constitutions/files/${encodeURIComponent(constitution.filename)}`;
                       link.download = constitution.filename;
                       link.click();
                     }}
-                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-sm flex items-center justify-center space-x-1 transition-colors"
+                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm flex items-center justify-center space-x-1 transition-colors"
                   >
-                    <ArrowDownTrayIcon className="h-4 w-4" />
+                    <ArrowDownTrayIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span>Télécharger</span>
                   </button>
                 </div>
