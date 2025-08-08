@@ -22,6 +22,7 @@ interface Constitution {
   title: string;
   year?: number;
   filename: string;
+  status?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -305,46 +306,71 @@ const ConstitutionsPage: React.FC = () => {
             </div>
           ) : (
             filteredConstitutions.map((constitution) => (
-              <div key={constitution.id} className="bg-white rounded-lg shadow-md p-6 flex flex-col h-64">
+              <div key={constitution.id} className="bg-white rounded-lg shadow-md p-6 flex flex-col min-h-[280px]">
+                {/* Header avec titre et boutons d'action */}
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xl font-bold text-gray-900 flex-1 pr-2">
+                  <h3 className="text-xl font-bold text-gray-900 flex-1 pr-2 line-clamp-2">
                     {constitution.title}
                   </h3>
-                  <div className="flex space-x-2 flex-shrink-0">
+                  <div className="flex space-x-2 flex-shrink-0 ml-2">
                     <button
                       onClick={() => {
                         setEditingConstitution(constitution);
                         setShowEditModal(true);
                       }}
-                      className="text-blue-600 hover:text-blue-800"
+                      className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
                     >
                       <PencilIcon className="h-5 w-5" />
                     </button>
-            <button
-              onClick={() => {
+                    <button
+                      onClick={() => {
                         setDeletingConstitution(constitution);
                         setShowDeleteModal(true);
-              }}
-                      className="text-red-600 hover:text-red-800"
-            >
+                      }}
+                      className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                    >
                       <TrashIcon className="h-5 w-5" />
-            </button>
+                    </button>
                   </div>
                 </div>
 
-                <div className="space-y-2 flex-1">
-                  <p className="text-gray-600">
-                    <span className="font-medium">Année:</span> {constitution.year || 'Non spécifiée'}
-                </p>
-                  <p className="text-sm text-gray-500">
+                {/* Contenu principal - prend l'espace disponible */}
+                <div className="flex-1 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-gray-600">
+                      <span className="font-medium">Année:</span> {constitution.year || 'Non spécifiée'}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <p className="text-gray-600">
+                      <span className="font-medium">Statut:</span> 
+                      <span className={`ml-1 px-2 py-1 text-xs rounded-full ${
+                        constitution.status === 'active' ? 'bg-green-100 text-green-800' :
+                        constitution.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                        constitution.status === 'archived' ? 'bg-gray-100 text-gray-800' :
+                        constitution.status === 'in_development' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {constitution.status === 'active' ? 'Actif' :
+                         constitution.status === 'draft' ? 'Brouillon' :
+                         constitution.status === 'archived' ? 'Archivé' :
+                         constitution.status === 'in_development' ? 'En projet' :
+                         constitution.status || 'Non spécifié'}
+                      </span>
+                    </p>
+                  </div>
+                  
+                  <div className="text-sm text-gray-500 truncate">
                     <span className="font-medium">Fichier:</span> {constitution.filename}
-                  </p>
+                  </div>
                 </div>
 
-                <div className="mt-4 flex space-x-2">
+                {/* Boutons toujours alignés en bas */}
+                <div className="mt-6 flex space-x-2 pt-4 border-t border-gray-100">
                   <button 
                     onClick={() => navigate(`/pdf/${encodeURIComponent(constitution.filename)}`)}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm flex items-center justify-center space-x-1"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm flex items-center justify-center space-x-1 transition-colors"
                   >
                     <EyeIcon className="h-4 w-4" />
                     <span>Voir</span>
@@ -357,7 +383,7 @@ const ConstitutionsPage: React.FC = () => {
                       link.download = constitution.filename;
                       link.click();
                     }}
-                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded text-sm flex items-center justify-center space-x-1"
+                    className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-sm flex items-center justify-center space-x-1 transition-colors"
                   >
                     <ArrowDownTrayIcon className="h-4 w-4" />
                     <span>Télécharger</span>
@@ -439,16 +465,17 @@ const ConstitutionsPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-bold mb-4">Modifier la constitution</h3>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                handleEditConstitution({
-                  title: formData.get('title') as string,
-                  year: parseInt(formData.get('year') as string) || undefined,
-                });
-              }}
-            >
+                          <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  handleEditConstitution({
+                    title: formData.get('title') as string,
+                    year: parseInt(formData.get('year') as string) || undefined,
+                    status: formData.get('status') as string,
+                  });
+                }}
+              >
             <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -472,6 +499,21 @@ const ConstitutionsPage: React.FC = () => {
                     defaultValue={editingConstitution.year}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Statut
+                  </label>
+                  <select
+                    name="status"
+                    defaultValue={editingConstitution.status || 'active'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="draft">Brouillon</option>
+                    <option value="active">Actif</option>
+                    <option value="archived">Archivé</option>
+                    <option value="in_development">En projet</option>
+                  </select>
                 </div>
               </div>
               <div className="flex justify-end space-x-2 mt-6">

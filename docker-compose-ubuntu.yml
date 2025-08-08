@@ -1,1 +1,38 @@
- 
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DATABASE_URL=sqlite:///./constitutionia.db
+      - HOST=0.0.0.0
+      - PORT=8000
+      - ENABLE_MONITORING=true
+    volumes:
+      - ./backend/Fichier:/app/Fichier
+      - ./backend/constitutionia.db:/app/constitutionia.db
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - constitutionia-network
+
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - constitutionia-network
+
+networks:
+  constitutionia-network:
+    driver: bridge 

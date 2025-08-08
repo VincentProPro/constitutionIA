@@ -12,6 +12,7 @@ interface Constitution {
   title: string;
   year: number;
   filename: string;
+  status: string;
 }
 
 const Header: React.FC = () => {
@@ -40,24 +41,28 @@ const Header: React.FC = () => {
     fetchConstitutions();
   }, []);
 
-  // Grouper les constitutions par année
-  const constitutionsByYear = constitutions.reduce((acc, constitution) => {
+  // Grouper les constitutions par année et statut
+  const constitutionsByYearAndStatus = constitutions.reduce((acc, constitution) => {
     const year = constitution.year || 0;
-    if (!acc[year]) {
-      acc[year] = [];
+    const status = constitution.status || 'unknown';
+    const key = `${year}_${status}`;
+    if (!acc[key]) {
+      acc[key] = {
+        year,
+        status,
+        constitutions: []
+      };
     }
-    acc[year].push(constitution);
+    acc[key].constitutions.push(constitution);
     return acc;
-  }, {} as Record<number, Constitution[]>);
+  }, {} as Record<string, { year: number; status: string; constitutions: Constitution[] }>);
 
-  // Trier les années par ordre décroissant
-  const sortedYears = Object.keys(constitutionsByYear)
-    .map(Number)
-    .sort((a, b) => b - a);
+  // Trier les groupes par année décroissante
+  const sortedGroups = Object.values(constitutionsByYearAndStatus)
+    .sort((a, b) => b.year - a.year);
 
   const navigation = [
     { name: 'Accueil', href: '/' },
-    { name: 'Copilot IA', href: '/ai-copilot' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -113,13 +118,17 @@ const Header: React.FC = () => {
                     <div className="px-4 py-2 text-sm text-gray-500">
                       Chargement...
                     </div>
-                  ) : sortedYears.length > 0 ? (
-                    sortedYears.map((year) => (
-                      <div key={year} className="border-b border-gray-100 last:border-b-0">
+                  ) : sortedGroups.length > 0 ? (
+                    sortedGroups.map((group) => (
+                      <div key={`${group.year}_${group.status}`} className="border-b border-gray-100 last:border-b-0">
                         <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                          Constitution {year}
+                          CONSTITUTION {group.status === 'active' ? 'ACTIF' : 
+                                      group.status === 'draft' ? 'BROUILLON' : 
+                                      group.status === 'archived' ? 'ARCHIVÉ' : 
+                                      group.status === 'in_development' ? 'EN PROJET' : 
+                                      group.status?.toUpperCase() || 'INCONNU'} {group.year}
                         </div>
-                        {constitutionsByYear[year].map((constitution) => (
+                        {group.constitutions.map((constitution) => (
                           <Link
                             key={constitution.id}
                             to={`/pdf/${encodeURIComponent(constitution.filename)}`}
@@ -189,13 +198,17 @@ const Header: React.FC = () => {
                   <div className="px-3 py-2 text-sm text-gray-500">
                     Chargement...
                   </div>
-                ) : sortedYears.length > 0 ? (
-                  sortedYears.map((year) => (
-                    <div key={year}>
+                ) : sortedGroups.length > 0 ? (
+                  sortedGroups.map((group) => (
+                    <div key={`${group.year}_${group.status}`}>
                       <div className="px-3 py-1 text-xs font-semibold text-gray-400">
-                        Constitution {year}
+                        CONSTITUTION {group.status === 'active' ? 'ACTIF' : 
+                                    group.status === 'draft' ? 'BROUILLON' : 
+                                    group.status === 'archived' ? 'ARCHIVÉ' : 
+                                    group.status === 'in_development' ? 'EN PROJET' : 
+                                    group.status?.toUpperCase() || 'INCONNU'} {group.year}
                       </div>
-                      {constitutionsByYear[year].map((constitution) => (
+                      {group.constitutions.map((constitution) => (
                         <Link
                           key={constitution.id}
                           to={`/pdf/${encodeURIComponent(constitution.filename)}`}

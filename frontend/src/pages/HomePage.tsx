@@ -41,11 +41,11 @@ const HomePage: React.FC = () => {
     },
     {
       id: 2,
-      title: "Copilot IA",
+      title: "Votre Assistant IA",
       subtitle: "Assistant intelligent",
       description: "Posez vos questions à notre IA spécialisée dans les constitutions",
       image: "/images/slider/slide-2.jpg",
-      cta: "Tester le Copilot"
+      cta: "Commencer"
     },
     {
       id: 2,
@@ -53,7 +53,7 @@ const HomePage: React.FC = () => {
       subtitle: "À LA NOUVELLE CONSTITUTION",
       description: "Découvrez la nouvelle Constitution guinéenne",
       image: "/images/slider/slide-5.jpg",
-      cta: "Tester le Copilot"
+      cta: "Découvrir"
     },
   
     {

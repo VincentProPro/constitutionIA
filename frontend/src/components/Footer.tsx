@@ -57,11 +57,6 @@ const Footer: React.FC = () => {
                   Constitutions
                 </Link>
               </li>
-              <li>
-                <Link to="/ai-copilot" className="text-gray-300 hover:text-white">
-                  Copilot IA
-                </Link>
-              </li>
             </ul>
           </div>
 
@@ -107,6 +102,13 @@ const Footer: React.FC = () => {
               <img 
                 src="/images/ANDE_TRANS.png" 
                 alt="ANDE" 
+                className="h-20 w-auto opacity-90 hover:opacity-100 transition-opacity"
+              />
+            </div>
+            <div className="flex items-center mt-4 md:mt-0">
+              <img 
+                src="/images/ministre.webp" 
+                alt="ministere" 
                 className="h-20 w-auto opacity-90 hover:opacity-100 transition-opacity"
               />
             </div>

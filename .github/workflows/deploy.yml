@@ -1,0 +1,38 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          cd /opt/constitutionia
+          git pull origin main
+          
+          # Copier .env si nécessaire
+          if [ -f ".env.example" ] && [ ! -f ".env" ]; then
+            cp .env.example .env
+            echo "⚠️  Veuillez configurer le fichier .env avec votre clé API OpenAI"
+          fi
+          
+          # Redémarrer les services
+          docker-compose -f docker-compose-ubuntu.yml down
+          docker-compose -f docker-compose-ubuntu.yml build --no-cache
+          docker-compose -f docker-compose-ubuntu.yml up -d
+          
+          echo "✅ Déploiement terminé!"
+          echo "🌐 Accès: http://${{ secrets.HOST }}" 
