@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNotification } from '../contexts/NotificationContext';
+import { useNotificationContext } from '../contexts/NotificationContext';
 
 interface Message {
   id: string;
@@ -12,7 +12,7 @@ interface Message {
 
 const ChatNowPage: React.FC = () => {
   const { user } = useAuth();
-  const { showNotification } = useNotification();
+  const { showError } = useNotificationContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +46,7 @@ const ChatNowPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Erreur lors du chargement des constitutions:', error);
-      showNotification('Erreur lors du chargement des constitutions', 'error');
+      showError('Erreur', 'Erreur lors du chargement des constitutions');
     }
   };
 
@@ -97,7 +97,7 @@ const ChatNowPage: React.FC = () => {
           constitution: selectedConstitution
         };
         setMessages(prev => [...prev, errorMessage]);
-        showNotification('Erreur lors de la communication avec l\'IA', 'error');
+        showError('Erreur', 'Erreur lors de la communication avec l\'IA');
       }
     } catch (error) {
       console.error('Erreur lors de l\'envoi du message:', error);
@@ -109,7 +109,7 @@ const ChatNowPage: React.FC = () => {
         constitution: selectedConstitution
       };
       setMessages(prev => [...prev, errorMessage]);
-      showNotification('Erreur de connexion', 'error');
+      showError('Erreur', 'Erreur de connexion');
     } finally {
       setIsLoading(false);
     }
