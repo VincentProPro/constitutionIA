@@ -8,6 +8,7 @@ class ConstitutionStatus(str, enum.Enum):
     ACTIVE = "active"
     ARCHIVED = "archived"
     IN_DEVELOPMENT = "in_development"
+    AVANT_PROJET = "avant_projet"
 
 class Constitution(Base):
     __tablename__ = "constitutions"

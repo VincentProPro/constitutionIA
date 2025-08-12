@@ -102,6 +102,9 @@ class OptimizedAIService:
         self.vector_db = None
         self.qa_chain = None
         self.is_initialized = False
+        
+        # Chemin pour persister la base vectorielle
+        self.vector_db_path = "vector_db_cache"
 
     def _get_cache_key(self, query: str) -> str:
         """Génère une clé de cache pour une requête"""
@@ -303,34 +306,42 @@ class OptimizedAIService:
                     logger.error(f"❌ Erreur LLM: {e}")
                     return False
 
-            # Charger les documents seulement si pas déjà fait
+            # Charger ou créer la base vectorielle
             if not self.vector_db:
-                logger.info("📚 Chargement des documents PDF...")
-                pdf_docs = self._load_pdf_documents()
-                if not pdf_docs:
-                    logger.warning("❌ Aucun document PDF trouvé")
-                    return False
+                # Essayer de charger la base vectorielle persistante
+                if self._load_vector_db_from_cache():
+                    logger.info("✅ Base vectorielle chargée depuis le cache")
+                else:
+                    logger.info("📚 Création d'une nouvelle base vectorielle...")
+                    pdf_docs = self._load_pdf_documents()
+                    if not pdf_docs:
+                        logger.warning("❌ Aucun document trouvé")
+                        return False
 
-                logger.info(f"📄 {len(pdf_docs)} documents PDF chargés")
+                    logger.info(f"📄 {len(pdf_docs)} documents chargés")
 
-                # Découper avec paramètres optimisés
-                text_splitter = RecursiveCharacterTextSplitter(
-                    chunk_size=self.chunk_size,
-                    chunk_overlap=self.chunk_overlap,
-                    length_function=len,
-                    separators=["\n\n", "\n", ". ", " ", ""]
-                )
-                docs = text_splitter.split_documents(pdf_docs)
-                logger.info(f"📄 {len(docs)} chunks créés (optimisé)")
+                    # Découper avec paramètres optimisés
+                    text_splitter = RecursiveCharacterTextSplitter(
+                        chunk_size=self.chunk_size,
+                        chunk_overlap=self.chunk_overlap,
+                        length_function=len,
+                        separators=["\n\n", "\n", ". ", " ", ""]
+                    )
+                    docs = text_splitter.split_documents(pdf_docs)
+                    logger.info(f"📄 {len(docs)} chunks créés (optimisé)")
 
-                # Créer la base vectorielle
-                logger.info("🔍 Création de la base vectorielle FAISS...")
-                try:
-                    self.vector_db = FAISS.from_documents(docs, self.embeddings)
-                    logger.info("✅ Base vectorielle FAISS créée")
-                except Exception as e:
-                    logger.error(f"❌ Erreur FAISS: {e}")
-                    return False
+                    # Créer la base vectorielle
+                    logger.info("🔍 Création de la base vectorielle FAISS...")
+                    try:
+                        self.vector_db = FAISS.from_documents(docs, self.embeddings)
+                        logger.info("✅ Base vectorielle FAISS créée")
+                        
+                        # Sauvegarder la base vectorielle
+                        self._save_vector_db_to_cache()
+                        logger.info("💾 Base vectorielle sauvegardée")
+                    except Exception as e:
+                        logger.error(f"❌ Erreur FAISS: {e}")
+                        return False
 
                 # Créer la chaîne RAG optimisée
                 custom_prompt = PromptTemplate(
@@ -380,10 +391,88 @@ RÉPONSE:"""
             return False
 
     def _load_pdf_documents(self, folder_path: str = "Fichier/") -> List:
-        """Charge les documents PDF avec gestion d'erreurs améliorée"""
+        """Charge les documents depuis la base de données au lieu des fichiers PDF"""
+        from app.database import SessionLocal
+        from app.models.constitution import Constitution
+        from app.models.pdf_import import Article
+        from langchain.schema import Document
+        
+        documents = []
+        db = SessionLocal()
+        
+        try:
+            logger.info("📚 Chargement des documents depuis la base de données...")
+            
+            # Récupérer toutes les constitutions avec leurs articles
+            constitutions = db.query(Constitution).filter(Constitution.is_active == True).all()
+            
+            if not constitutions:
+                logger.warning("❌ Aucune constitution active trouvée en base de données")
+                return documents
+            
+            logger.info(f"📋 {len(constitutions)} constitutions trouvées")
+            
+            for constitution in constitutions:
+                # Récupérer tous les articles de cette constitution
+                articles = db.query(Article).filter(Article.constitution_id == constitution.id).all()
+                
+                if not articles:
+                    logger.info(f"📄 Constitution '{constitution.title}' - Aucun article trouvé")
+                    continue
+                
+                logger.info(f"📄 Constitution '{constitution.title}' - {len(articles)} articles")
+                
+                # Créer des documents LangChain à partir des articles
+                for article in articles:
+                    if not article.content or len(article.content.strip()) < 10:
+                        continue  # Ignorer les articles vides ou trop courts
+                    
+                    # Créer le contenu du document
+                    content = f"Article {article.article_number}"
+                    if article.title:
+                        content += f": {article.title}\n\n"
+                    else:
+                        content += "\n\n"
+                    content += article.content
+                    
+                    # Créer le document LangChain
+                    doc = Document(
+                        page_content=content,
+                        metadata={
+                            'source': constitution.filename,
+                            'constitution_id': constitution.id,
+                            'constitution_title': constitution.title,
+                            'article_number': article.article_number,
+                            'article_title': article.title,
+                            'part': article.part,
+                            'section': article.section,
+                            'page_number': article.page_number,
+                            'file_path': f"db://constitution_{constitution.id}/article_{article.id}"
+                        }
+                    )
+                    documents.append(doc)
+            
+            logger.info(f"✅ {len(documents)} documents créés depuis la base de données")
+            
+            # Si aucun document n'a été créé, essayer de charger depuis les fichiers PDF comme fallback
+            if not documents:
+                logger.warning("⚠️ Aucun document créé depuis la base, tentative de chargement depuis les fichiers PDF...")
+                documents = self._load_pdf_documents_fallback(folder_path)
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur lors du chargement depuis la base de données: {str(e)}")
+            logger.warning("⚠️ Fallback vers le chargement depuis les fichiers PDF...")
+            return self._load_pdf_documents_fallback(folder_path)
+        finally:
+            db.close()
+
+    def _load_pdf_documents_fallback(self, folder_path: str = "Fichier/") -> List:
+        """Méthode de fallback pour charger depuis les fichiers PDF (ancienne méthode)"""
         documents = []
 
-        logger.info(f"📁 Vérification du dossier: {folder_path}")
+        logger.info(f"📁 Chargement de fallback depuis le dossier: {folder_path}")
         if not os.path.exists(folder_path):
             logger.warning(f"❌ Le dossier {folder_path} n'existe pas.")
             return documents
@@ -411,8 +500,63 @@ RÉPONSE:"""
                 logger.error(f"❌ Erreur lors du chargement de {filename}: {str(e)}")
                 continue
 
-        logger.info(f"📚 Total: {len(documents)} documents chargés")
+        logger.info(f"📚 Total fallback: {len(documents)} documents chargés")
         return documents
+
+    def _save_vector_db_to_cache(self):
+        """Sauvegarde la base vectorielle dans le cache"""
+        try:
+            if self.vector_db and os.path.exists(self.vector_db_path):
+                import shutil
+                shutil.rmtree(self.vector_db_path)
+            
+            if self.vector_db:
+                self.vector_db.save_local(self.vector_db_path)
+                logger.info(f"💾 Base vectorielle sauvegardée dans {self.vector_db_path}")
+        except Exception as e:
+            logger.error(f"❌ Erreur lors de la sauvegarde de la base vectorielle: {e}")
+
+    def _load_vector_db_from_cache(self):
+        """Charge la base vectorielle depuis le cache"""
+        try:
+            if os.path.exists(self.vector_db_path) and self.embeddings:
+                self.vector_db = FAISS.load_local(self.vector_db_path, self.embeddings)
+                logger.info(f"📂 Base vectorielle chargée depuis {self.vector_db_path}")
+                return True
+            else:
+                logger.info("📂 Aucune base vectorielle en cache trouvée")
+                return False
+        except Exception as e:
+            logger.error(f"❌ Erreur lors du chargement de la base vectorielle: {e}")
+            return False
+
+    def refresh_vector_db(self):
+        """Force le rafraîchissement de la base vectorielle"""
+        try:
+            logger.info("🔄 Rafraîchissement de la base vectorielle...")
+            
+            # Supprimer l'ancienne base vectorielle
+            if os.path.exists(self.vector_db_path):
+                import shutil
+                shutil.rmtree(self.vector_db_path)
+                logger.info("🗑️ Ancienne base vectorielle supprimée")
+            
+            # Réinitialiser les composants
+            self.vector_db = None
+            self.qa_chain = None
+            self.is_initialized = False
+            
+            # Recréer la base vectorielle
+            success = self._initialize_rag_lazy()
+            if success:
+                logger.info("✅ Base vectorielle rafraîchie avec succès")
+            else:
+                logger.error("❌ Échec du rafraîchissement de la base vectorielle")
+            
+            return success
+        except Exception as e:
+            logger.error(f"❌ Erreur lors du rafraîchissement: {e}")
+            return False
 
     def _rag_search_optimized(self, query: str) -> Dict[str, Any]:
         """Recherche RAG optimisée avec timeout et gestion d'erreurs"""

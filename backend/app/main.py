@@ -3,7 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import ai_copilot, constitutions
 from app.database import engine
 from app.models import constitution, user
+from app.services.automation_service import start_automation_service, stop_automation_service
 import os
+import atexit
 
 # Créer les tables
 constitution.Base.metadata.create_all(bind=engine)
@@ -34,6 +36,33 @@ app.add_middleware(
 app.include_router(ai_copilot.router, prefix="/api/ai", tags=["AI Copilot"])
 app.include_router(constitutions.router, prefix="/api/constitutions", tags=["Constitutions"])
 
+@app.on_event("startup")
+async def startup_event():
+    """Événement de démarrage de l'application"""
+    print("🚀 Démarrage de ConstitutionIA API")
+    print("📋 Initialisation du service d'automatisation...")
+    
+    # Démarrer le service d'automatisation
+    start_automation_service()
+    
+    # Enregistrer la fonction d'arrêt
+    atexit.register(stop_automation_service)
+    
+    print("✅ Service d'automatisation démarré")
+    print("✅ ConstitutionIA API prête")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Événement d'arrêt de l'application"""
+    print("🛑 Arrêt de ConstitutionIA API")
+    print("📋 Arrêt du service d'automatisation...")
+    
+    # Arrêter le service d'automatisation
+    stop_automation_service()
+    
+    print("✅ Service d'automatisation arrêté")
+    print("✅ ConstitutionIA API arrêtée")
+
 @app.get("/")
 async def root():
     return {"message": "ConstitutionIA API - Système RAG avec FAISS"}
@@ -41,6 +70,13 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "system": "RAG with FAISS"}
+
+@app.get("/automation/status")
+async def get_automation_status():
+    """Obtenir le statut du service d'automatisation"""
+    from app.services.automation_service import get_automation_service
+    service = get_automation_service()
+    return service.get_status()
 
 if __name__ == "__main__":
     import uvicorn

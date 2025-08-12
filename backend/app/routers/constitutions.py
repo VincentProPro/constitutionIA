@@ -11,7 +11,13 @@ from app.models.constitution import Constitution as ConstitutionModel, Constitut
 from sqlalchemy import or_, and_
 from app.services.pdf_analyzer import PDFAnalyzer
 from app.services.file_watcher import FileWatcher
+from app.services.pdf_import import process_uploaded_pdf, delete_pdf_articles
+from app.models.pdf_import import Article, Metadata
 from app.core.config import settings
+
+# Ajout pour Range support
+from fastapi import Request
+from starlette.responses import StreamingResponse
 
 router = APIRouter()
 
@@ -162,18 +168,67 @@ async def list_constitution_files():
     return pdf_files
 
 @router.get("/files/{filename}")
-async def get_constitution_file(filename: str):
-    """Télécharger un fichier PDF de constitution"""
+async def get_constitution_file(filename: str, request: Request):
+    """Télécharger un fichier PDF de constitution (supporte les requêtes Range)"""
     import os
     current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     file_path = Path(current_dir) / "Fichier" / filename
     
     if not file_path.exists() or not filename.endswith('.pdf'):
         raise HTTPException(status_code=404, detail="Fichier non trouvé")
-    
-    from fastapi.responses import FileResponse
-    
-    # Utiliser FileResponse qui gère correctement les fichiers binaires
+
+    file_size = file_path.stat().st_size
+
+    # Gestion des requêtes Range
+    range_header = request.headers.get('range') or request.headers.get('Range')
+    if range_header and range_header.startswith('bytes='):
+        # Exemple d'en-tête: Range: bytes=START-END
+        range_spec = range_header.split('=')[1]
+        start_str, end_str = (range_spec.split('-') + [''])[:2]
+        try:
+            start = int(start_str) if start_str else 0
+            end = int(end_str) if end_str else file_size - 1
+        except ValueError:
+            start, end = 0, file_size - 1
+        if start < 0:
+            start = 0
+        if end >= file_size:
+            end = file_size - 1
+        if start > end:
+            start, end = 0, file_size - 1
+        chunk_size = (end - start) + 1
+
+        def iter_file(path: Path, offset: int, length: int, block_size: int = 1024 * 64):
+            with open(path, 'rb') as f:
+                f.seek(offset)
+                remaining = length
+                while remaining > 0:
+                    read_size = block_size if remaining >= block_size else remaining
+                    data = f.read(read_size)
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    yield data
+        
+        headers = {
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+            "Accept-Ranges": "bytes",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Content-Disposition": f"inline; filename={filename}",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+        return StreamingResponse(
+            iter_file(file_path, start, chunk_size),
+            status_code=206,
+            media_type='application/pdf',
+            headers=headers
+        )
+
+    # Réponse normale (pas de Range)
     return FileResponse(
         path=file_path,
         media_type='application/pdf',
@@ -181,7 +236,11 @@ async def get_constitution_file(filename: str):
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
             "Access-Control-Allow-Headers": "*",
-            "Content-Disposition": f"inline; filename={filename}"
+            "Content-Disposition": f"inline; filename={filename}",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Accept-Ranges": "bytes"
         }
     )
 
@@ -200,7 +259,7 @@ async def head_constitution_file(filename: str):
     # Lire la taille du fichier pour le Content-Length
     file_size = file_path.stat().st_size
     
-    # Retourner une réponse HEAD avec les headers CORS
+    # Retourner une réponse HEAD avec les headers CORS et no-cache
     return Response(
         status_code=200,
         headers={
@@ -209,7 +268,11 @@ async def head_constitution_file(filename: str):
             "Access-Control-Allow-Headers": "*",
             "Content-Type": "application/pdf",
             "Content-Disposition": f"inline; filename={filename}",
-            "Content-Length": str(file_size)
+            "Content-Length": str(file_size),
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Accept-Ranges": "bytes"
         }
     )
 
@@ -337,6 +400,15 @@ async def delete_constitution_file(filename: str, db: Session = Depends(get_db))
         ).first()
         
         if constitution:
+            # Supprimer les articles associés
+            try:
+                delete_pdf_articles(db, constitution.id)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"❌ Erreur lors de la suppression des articles: {e}")
+            
+            # Supprimer la constitution
             db.delete(constitution)
             db.commit()
         
@@ -364,23 +436,29 @@ async def upload_constitution_file(
         if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Seuls les fichiers PDF sont acceptés")
         
-        # Vérifier la taille du fichier (max 10MB)
-        if file.size and file.size > 10 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="Le fichier est trop volumineux. Taille maximale : 10MB")
+        # Vérifier la taille du fichier (max 16MB)
+        if file.size and file.size > 16 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Le fichier est trop volumineux. Taille maximale : 16MB")
         
         # Créer le dossier Fichier s'il n'existe pas
         upload_dir = Path("Fichier")
         upload_dir.mkdir(exist_ok=True)
         
-        # Générer un nom de fichier unique
-        filename = file.filename
+        # Générer un nom de fichier UNIQUE systématiquement (base assainie + timestamp)
+        import re
+        from datetime import datetime
+        original_name, ext = os.path.splitext(file.filename)
+        safe_base = re.sub(r"[^A-Za-z0-9 _\.-]+", "", original_name).strip()
+        if not safe_base:
+            safe_base = "document"
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        filename = f"{safe_base}-{timestamp}{ext}"
         file_path = upload_dir / filename
         
-        # Vérifier si le fichier existe déjà
+        # En cas de collision improbable, ajouter un compteur
         counter = 1
         while file_path.exists():
-            name, ext = os.path.splitext(filename)
-            filename = f"{name}_{counter}{ext}"
+            filename = f"{safe_base}-{timestamp}_{counter}{ext}"
             file_path = upload_dir / filename
             counter += 1
         
@@ -391,7 +469,7 @@ async def upload_constitution_file(
         # Créer une entrée simple dans la base de données
         new_constitution = ConstitutionModel(
             filename=filename,
-            title=filename.replace('.pdf', ''),
+            title=safe_base,
             description='',
             year=None,
             country="Guinée",
@@ -408,13 +486,193 @@ async def upload_constitution_file(
         db.commit()
         db.refresh(new_constitution)
         
+        # Traitement automatique du PDF pour extraire les articles
+        try:
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            result = process_uploaded_pdf(db, new_constitution.id, str(file_path))
+            if result['success']:
+                logger.info(f"✅ Articles extraits: {result['articles_count']} articles trouvés")
+                
+                # Rafraîchir la base vectorielle avec les nouveaux articles
+                try:
+                    from app.services.optimized_ai_service import get_optimized_ai_service
+                    ai_service = get_optimized_ai_service()
+                    ai_service.refresh_vector_db()
+                    logger.info("✅ Base vectorielle rafraîchie avec les nouveaux articles")
+                except Exception as refresh_error:
+                    logger.warning(f"⚠️ Échec du rafraîchissement de la base vectorielle: {refresh_error}")
+                
+                # Mettre à jour le message de retour
+                message = f"Fichier {filename} uploadé et analysé avec succès ({result['articles_count']} articles extraits)"
+            else:
+                logger.warning(f"⚠️ Échec de l'extraction des articles: {result.get('error', 'Erreur inconnue')}")
+                message = f"Fichier {filename} uploadé mais échec de l'extraction des articles"
+        except Exception as e:
+            logger.error(f"❌ Erreur lors du traitement automatique: {e}")
+            message = f"Fichier {filename} uploadé mais erreur lors de l'analyse"
+        
         return {
-            "message": f"Fichier {filename} uploadé et analysé avec succès",
+            "message": message,
             "filename": filename,
-            "constitution": new_constitution
+            "constitution": new_constitution,
+            "articles_extracted": result.get('articles_count', 0) if 'result' in locals() else 0
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors de l'upload: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'upload: {str(e)}")
+
+@router.get("/{constitution_id}/articles")
+async def get_constitution_articles(
+    constitution_id: int,
+    db: Session = Depends(get_db)
+):
+    """Récupérer tous les articles d'une constitution"""
+    try:
+        # Vérifier que la constitution existe
+        constitution = db.query(ConstitutionModel).filter(
+            ConstitutionModel.id == constitution_id,
+            ConstitutionModel.is_active == True
+        ).first()
+        
+        if not constitution:
+            raise HTTPException(status_code=404, detail="Constitution non trouvée")
+        
+        # Récupérer les articles
+        articles = db.query(Article).filter(
+            Article.constitution_id == constitution_id
+        ).order_by(Article.article_number).all()
+        
+        # Formater la réponse
+        articles_data = []
+        for article in articles:
+            articles_data.append({
+                "id": article.id,
+                "article_number": article.article_number,
+                "title": article.title,
+                "content": article.content,
+                "part": article.part,
+                "section": article.section,
+                "page_number": article.page_number,
+                "created_at": article.created_at,
+                "updated_at": article.updated_at
+            })
+        
+        return {
+            "constitution": {
+                "id": constitution.id,
+                "title": constitution.title,
+                "filename": constitution.filename
+            },
+            "articles_count": len(articles_data),
+            "articles": articles_data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la récupération des articles: {str(e)}")
+
+@router.get("/articles/search")
+async def search_articles(
+    query: str = Query(..., description="Terme de recherche"),
+    constitution_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """Rechercher dans les articles"""
+    try:
+        # Construire la requête
+        search_query = db.query(Article).filter(
+            or_(
+                Article.content.ilike(f"%{query}%"),
+                Article.article_number.ilike(f"%{query}%"),
+                Article.title.ilike(f"%{query}%")
+            )
+        )
+        
+        # Filtrer par constitution si spécifié
+        if constitution_id:
+            search_query = search_query.filter(Article.constitution_id == constitution_id)
+        
+        # Récupérer les résultats
+        articles = search_query.limit(50).all()
+        
+        # Formater la réponse
+        results = []
+        for article in articles:
+            # Récupérer les informations de la constitution
+            constitution = db.query(ConstitutionModel).filter(
+                ConstitutionModel.id == article.constitution_id
+            ).first()
+            
+            results.append({
+                "id": article.id,
+                "article_number": article.article_number,
+                "title": article.title,
+                "content": article.content[:200] + "..." if len(article.content) > 200 else article.content,
+                "part": article.part,
+                "section": article.section,
+                "constitution": {
+                    "id": constitution.id if constitution else None,
+                    "title": constitution.title if constitution else "Inconnue",
+                    "filename": constitution.filename if constitution else "Inconnu"
+                }
+            })
+        
+        return {
+            "query": query,
+            "results_count": len(results),
+            "results": results
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la recherche: {str(e)}") 
+
+@router.get("/automation/status")
+async def get_automation_status():
+    """Obtenir le statut du service d'automatisation"""
+    from app.services.automation_service import get_automation_service
+    service = get_automation_service()
+    return service.get_status()
+
+@router.post("/automation/force-process/{filename}")
+async def force_process_file(filename: str):
+    """Forcer le traitement d'un fichier spécifique"""
+    try:
+        from app.services.automation_service import get_automation_service
+        service = get_automation_service()
+        
+        success = service.force_process_file(filename)
+        
+        if success:
+            return {
+                "message": f"Fichier {filename} traité avec succès",
+                "filename": filename,
+                "status": "success"
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"Échec du traitement de {filename}")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors du traitement: {str(e)}")
+
+@router.post("/automation/scan")
+async def scan_for_new_files():
+    """Scanner manuellement les nouveaux fichiers"""
+    try:
+        from app.services.automation_service import get_automation_service
+        service = get_automation_service()
+        
+        # Forcer un scan
+        service._scan_and_process_new_files()
+        
+        return {
+            "message": "Scan terminé",
+            "status": "success"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors du scan: {str(e)}") 
