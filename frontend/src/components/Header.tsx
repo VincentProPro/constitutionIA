@@ -63,6 +63,7 @@ const Header: React.FC = () => {
 
   const navigation = [
     { name: 'Accueil', href: '/' },
+    { name: '💬 ChatNow', href: '/chatnow' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -226,6 +227,21 @@ const Header: React.FC = () => {
                     Aucune constitution disponible
                   </div>
                 )}
+              </div>
+              
+              {/* ChatNow Mobile */}
+              <div className="border-t border-gray-200 pt-2 mt-2">
+                <Link
+                  to="/chatnow"
+                  className={`block px-3 py-2 rounded-md text-base font-medium ${
+                    isActive('/chatnow')
+                      ? 'text-primary-600 bg-primary-50'
+                      : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  💬 ChatNow
+                </Link>
               </div>
             </div>
           </div>

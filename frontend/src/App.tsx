@@ -4,6 +4,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import NotificationContainer from './components/NotificationContainer';
 import HomePage from './pages/HomePage';
 import ConstitutionsPage from './pages/ConstitutionsPage';
+import ChatNowPage from './pages/ChatNowPage';
 
 const App: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
@@ -31,8 +32,9 @@ const App: React.FC = () => {
           <NotificationContainer />
         <Routes>
           <Route path="/" element={<HomePage />} />
-            <Route path="/constitutions" element={<ConstitutionsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/constitutions" element={<ConstitutionsPage />} />
+          <Route path="/chatnow" element={<ChatNowPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </Router>
