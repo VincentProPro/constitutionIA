@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { PaperAirplaneIcon, ChatBubbleLeftRightIcon, XMarkIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline';
 
 interface Message {
@@ -70,15 +72,14 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
     const startTime = Date.now();
 
     try {
-      const response = await fetch('/api/ai/chat', {
+      const response = await fetch('/api/ai/chat/pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: inputText,
-          context: 'Constitution Guinée',
-          max_results: 5
+          filename,
+          question: userMessage.text
         })
       });
 
@@ -87,30 +88,17 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
       }
 
       const data = await response.json();
-      const backendTime = Math.round((data.search_time || 0) * 1000); // Convertir en ms
+      const backendTime = Math.round((data.search_time || 0) * 1000);
       const totalTime = Date.now() - startTime;
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: data.answer,
+        text: data.response || data.answer || 'Réponse indisponible',
         isUser: false,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      
-      // Afficher les suggestions si disponibles
-      if (data.suggestions && data.suggestions.length > 0) {
-        setTimeout(() => {
-          const suggestionsMessage: Message = {
-            id: (Date.now() + 3).toString(),
-            text: `💡 Suggestions: ${data.suggestions.join(', ')}`,
-            isUser: false,
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, suggestionsMessage]);
-        }, 1000);
-      }
     } catch (error) {
       console.error('Erreur:', error);
       const errorMessage: Message = {
@@ -148,15 +136,14 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
       setIsLoading(true);
       
       // Appeler l'API
-              fetch('/api/ai/chat', {
+      fetch('/api/ai/chat/pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: question,
-          context: 'Constitution Guinée',
-          max_results: 5
+          filename,
+          question
         })
       })
       .then(response => {
@@ -168,7 +155,7 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
       .then(data => {
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: data.answer,
+          text: data.response || data.answer || 'Réponse indisponible',
           isUser: false,
           timestamp: new Date()
         };
@@ -262,7 +249,13 @@ const AIChat: React.FC<AIChatProps> = ({ filename, isOpen, onClose, onToggleExpa
                   : 'bg-white text-gray-800 border border-gray-200'
               }`}
             >
-              <p className="text-xs sm:text-sm leading-relaxed">{message.text}</p>
+              {message.isUser ? (
+                <p className="text-xs sm:text-sm leading-relaxed">{message.text}</p>
+              ) : (
+                <div className="prose prose-sm max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.text}</ReactMarkdown>
+                </div>
+              )}
               <p className={`text-xs mt-1 sm:mt-2 ${
                 message.isUser ? 'text-blue-100' : 'text-gray-500'
               }`}>

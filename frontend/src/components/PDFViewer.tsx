@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { downloadFileFromUrl } from '../utils/downloadFile';
 
 interface PDFViewerProps {
   filename: string;
@@ -8,13 +9,17 @@ interface PDFViewerProps {
 }
 
 const PDFViewer: React.FC<PDFViewerProps> = ({ filename, isOpen, onClose }) => {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const pdfUrl = `/api/constitutions/files/${encodeURIComponent(filename)}`;
+  const basePdfUrl = `/api/constitutions/files/${encodeURIComponent(filename)}`;
+  const cacheBuster = useMemo(() => Date.now(), [isOpen, filename]);
+  const pdfUrlWithBuster = `${basePdfUrl}?v=${cacheBuster}`;
 
   useEffect(() => {
     if (isOpen) {
-      setLoading(false);
+      setLoading(true);
+      setError(null);
     }
   }, [isOpen]);
 
@@ -33,6 +38,15 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ filename, isOpen, onClose }) => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const handleIframeLoad = () => {
+    setLoading(false);
+  };
+
+  const handleIframeError = () => {
+    setLoading(false);
+    setError('Erreur lors du chargement du PDF');
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -41,50 +55,70 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ filename, isOpen, onClose }) => {
         {/* Header */}
         <div className="flex items-start sm:items-center justify-between p-3 sm:p-4 border-b border-gray-200">
           <div className="flex items-start sm:items-center space-x-2 sm:space-x-4 flex-1 min-w-0">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 break-words leading-tight">
-              {filename}
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 break-words leading-tight" title={filename}>
+              {filename.length > 20 ? `${filename.slice(0, 20)}...` : filename}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 sm:p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0 ml-2 sm:ml-0"
-          >
-            <XMarkIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={async () => {
+                const safeName = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+                try {
+                  await downloadFileFromUrl(pdfUrlWithBuster, safeName);
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              title="Télécharger"
+            >
+              <DocumentTextIcon className="w-5 h-5 text-gray-500" />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1 sm:p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0 ml-2 sm:ml-0"
+            >
+              <XMarkIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500" />
+            </button>
+          </div>
         </div>
 
         {/* PDF Content */}
         <div className="flex-1 relative overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center h-full bg-gray-50">
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-gray-600">Chargement du PDF...</p>
               </div>
             </div>
-          ) : (
+          )}
+          
+          {error ? (
             <div className="flex items-center justify-center h-full bg-gray-50 p-4">
               <div className="text-center max-w-sm sm:max-w-md">
-                <DocumentTextIcon className="h-12 w-12 sm:h-16 sm:w-16 text-blue-600 mx-auto mb-3 sm:mb-4" />
+                <DocumentTextIcon className="h-12 w-12 sm:h-16 sm:w-16 text-red-500 mx-auto mb-3 sm:mb-4" />
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 break-words leading-tight">
-                  {filename}
+                  Erreur de chargement
                 </h3>
                 <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
-                  Le PDF est maintenant correctement servi. Utilisez les boutons ci-dessous pour l'ouvrir ou le télécharger.
+                  {error}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2 sm:space-x-3">
                   <button
-                    onClick={() => window.open(pdfUrl, '_blank')}
+                    onClick={() => window.open(pdfUrlWithBuster, '_blank')}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base"
                   >
-                    Ouvrir le PDF
+                    Ouvrir dans un nouvel onglet
                   </button>
                   <button
-                    onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = pdfUrl;
-                      link.download = filename;
-                      link.click();
+                    onClick={async () => {
+                      const safeName = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+                      try {
+                        await downloadFileFromUrl(pdfUrlWithBuster, safeName);
+                      } catch (e) {
+                        console.error(e);
+                      }
                     }}
                     className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 sm:px-6 py-2 rounded-lg font-medium transition-colors text-sm sm:text-base"
                   >
@@ -93,35 +127,15 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ filename, isOpen, onClose }) => {
                 </div>
               </div>
             </div>
+          ) : (
+            <iframe
+              src={pdfUrlWithBuster}
+              className="w-full h-full border-0"
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
+              title={filename}
+            />
           )}
-        </div>
-
-
-
-        {/* Footer */}
-        <div className="flex flex-col sm:flex-row items-center justify-between p-3 sm:p-4 border-t border-gray-200 bg-gray-50 gap-2 sm:gap-0">
-          <div className="flex flex-col sm:flex-row gap-2 sm:space-x-4">
-            <button
-              onClick={() => window.open(pdfUrl, '_blank')}
-              className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium"
-            >
-              Ouvrir dans un nouvel onglet
-            </button>
-            <button
-              onClick={() => {
-                const link = document.createElement('a');
-                link.href = pdfUrl;
-                link.download = filename;
-                link.click();
-              }}
-              className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium"
-            >
-              Télécharger
-            </button>
-          </div>
-          <div className="text-xs sm:text-sm text-gray-500">
-            Appuyez sur Échap pour fermer
-          </div>
         </div>
       </div>
     </div>

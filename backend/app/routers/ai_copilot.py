@@ -263,14 +263,17 @@ async def chat_with_pdf(
 ):
     """Chat avec l'IA sur un fichier PDF spécifique - Utilise les données de la base"""
     try:
-        # Trouver la constitution correspondante au fichier
+        # Trouver la constitution correspondante au fichier (active uniquement)
         constitution = db.query(ConstitutionModel).filter(
             ConstitutionModel.filename == request.filename,
             ConstitutionModel.is_active == True
         ).first()
         
         if not constitution:
-            raise HTTPException(status_code=404, detail="Constitution non trouvée en base de données")
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Constitution '{request.filename}' non trouvée ou supprimée. Veuillez sélectionner une constitution active."
+            )
         
         # Utiliser le service IA optimisé avec les données de la base
         ai_service = get_optimized_ai_service()
@@ -285,7 +288,8 @@ async def chat_with_pdf(
         # Créer un contexte spécifique à cette constitution
         context_parts = []
         context_parts.append(f"CONSTITUTION: {constitution.title}")
-        context_parts.append(f"FICHIER: {constitution.filename}")
+        context_parts.append("")
+        context_parts.append("IMPORTANT: Utilisez uniquement le titre de la constitution, jamais le nom du fichier technique.")
         context_parts.append("")
         
         # Rechercher les articles pertinents pour la question
@@ -335,9 +339,11 @@ async def chat_with_pdf(
 RÈGLES STRICTES:
 1) Réponds UNIQUEMENT à partir des articles de cette constitution spécifique
 2) Cite impérativement l'article exact avec son numéro
-3) Si l'information n'est pas dans cette constitution, réponds: "Cette information n'est pas présente dans {constitution.title}"
+3) Si l'information n'est pas dans cette constitution, réponds: "Cette information n'est pas présente dans cette constitution"
 4) Réponds en français de manière claire et structurée
-5) Indique toujours la source: "Selon l'article X de {constitution.title}..."
+5) Indique toujours la source: "Selon l'article X..."
+6) N'utilise JAMAIS le nom du fichier technique ni le titre de la constitution dans la réponse
+7) Cite seulement le numéro d'article, pas le nom du document
 """
 
         user_prompt = f"""Question: {request.question}
@@ -345,7 +351,8 @@ RÈGLES STRICTES:
 Contexte de la constitution {constitution.title}:
 {context}
 
-Réponds en te basant uniquement sur cette constitution spécifique."""
+Réponds en te basant uniquement sur cette constitution spécifique.
+IMPORTANT: Cite seulement le numéro d'article (ex: "Selon l'article 44..."), sans mentionner le nom du fichier ni le titre de la constitution."""
 
         # Utiliser directement OpenAI pour une réponse précise
         from openai import OpenAI

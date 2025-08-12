@@ -29,7 +29,7 @@ async def get_constitutions(
     status: Optional[ConstitutionStatus] = None,
     db: Session = Depends(get_db)
 ):
-    """Récupérer toutes les constitutions avec filtres optionnels"""
+    """Récupérer toutes les constitutions actives avec filtres optionnels"""
     query = db.query(ConstitutionModel).filter(ConstitutionModel.is_active == True)
     
     if year:
@@ -37,6 +37,17 @@ async def get_constitutions(
     if status:
         query = query.filter(ConstitutionModel.status == status)
     
+    constitutions = query.offset(skip).limit(limit).all()
+    return constitutions
+
+@router.get("/all", response_model=List[Constitution])
+async def get_all_constitutions(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """Récupérer toutes les constitutions (actives et inactives)"""
+    query = db.query(ConstitutionModel)
     constitutions = query.offset(skip).limit(limit).all()
     return constitutions
 
@@ -96,7 +107,7 @@ async def update_constitution(
 
 @router.delete("/{constitution_id}")
 async def delete_constitution(constitution_id: int, db: Session = Depends(get_db)):
-    """Supprimer une constitution (soft delete)"""
+    """Supprimer une constitution (soft delete) et nettoyer les articles"""
     db_constitution = db.query(ConstitutionModel).filter(
         ConstitutionModel.id == constitution_id,
         ConstitutionModel.is_active == True
@@ -105,9 +116,65 @@ async def delete_constitution(constitution_id: int, db: Session = Depends(get_db
     if not db_constitution:
         raise HTTPException(status_code=404, detail="Constitution non trouvée")
     
+    # Supprimer les articles associés
+    articles_deleted = db.query(Article).filter(Article.constitution_id == constitution_id).delete()
+    
+    # Soft delete de la constitution
     db_constitution.is_active = False
+    
+    # Vérifier s'il reste des constitutions actives
+    active_constitutions = db.query(ConstitutionModel).filter(ConstitutionModel.is_active == True).count()
+    
+    # Si aucune constitution active, réactiver la plus récente qui a des articles
+    if active_constitutions == 0:
+        # Trouver la constitution inactive la plus récente qui a des articles
+        inactive_constitution = db.query(ConstitutionModel).filter(
+            ConstitutionModel.is_active == False
+        ).order_by(ConstitutionModel.created_at.desc()).first()
+        
+        if inactive_constitution:
+            # Réactiver cette constitution et extraire ses articles
+            inactive_constitution.is_active = True
+            db.commit()
+            
+            # Réactiver cette constitution (les articles seront importés manuellement)
+            return {
+                "message": f"Constitution '{db_constitution.title}' supprimée. Constitution '{inactive_constitution.title}' réactivée automatiquement. Veuillez importer les articles manuellement.",
+                "articles_deleted": articles_deleted,
+                "constitution_reactivated": inactive_constitution.title,
+                "note": "Importez les articles avec: python fix_articles_constitution_links.py"
+            }
+    
     db.commit()
-    return {"message": "Constitution supprimée avec succès"}
+    
+    return {
+        "message": f"Constitution '{db_constitution.title}' supprimée avec succès",
+        "articles_deleted": articles_deleted
+    }
+
+@router.post("/{constitution_id}/reactivate")
+async def reactivate_constitution(constitution_id: int, db: Session = Depends(get_db)):
+    """Réactiver une constitution inactive et importer ses articles"""
+    db_constitution = db.query(ConstitutionModel).filter(
+        ConstitutionModel.id == constitution_id,
+        ConstitutionModel.is_active == False
+    ).first()
+    
+    if not db_constitution:
+        raise HTTPException(status_code=404, detail="Constitution inactive non trouvée")
+    
+    # Désactiver toutes les autres constitutions
+    db.query(ConstitutionModel).filter(ConstitutionModel.is_active == True).update({"is_active": False})
+    
+    # Réactiver cette constitution
+    db_constitution.is_active = True
+    db.commit()
+    
+    # Réactiver cette constitution (les articles seront importés manuellement)
+    return {
+        "message": f"Constitution '{db_constitution.title}' réactivée avec succès. Veuillez importer les articles manuellement.",
+        "note": "Importez les articles avec: python fix_articles_constitution_links.py"
+    }
 
 @router.post("/search", response_model=List[Constitution])
 async def search_constitutions(

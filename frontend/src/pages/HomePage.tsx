@@ -44,7 +44,7 @@ const HomePage: React.FC = () => {
       title: "ConstitutionIA",
       subtitle: "Plateforme de gestion des constitutions",
       description: "Accédez facilement aux constitutions de la Guinée et interrogez notre assistant IA",
-      slideNumber: 1, // Changé de 7 à 1 car slide-1.jpg existe
+      slideNumber: 7, // Utilise slide-7.jpg pour la première image
       cta: "Explorer les Constitutions"
     },
     {

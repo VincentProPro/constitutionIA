@@ -206,6 +206,7 @@ const Header: React.FC = () => {
                                     group.status === 'draft' ? 'BROUILLON' : 
                                     group.status === 'archived' ? 'ARCHIVÉ' : 
                                     group.status === 'in_development' ? 'EN PROJET' : 
+                                    group.status === 'avant_projet' ? 'AVANT PROJET' : 
                                     group.status?.toUpperCase() || 'INCONNU'} {group.year}
                       </div>
                       {group.constitutions.map((constitution) => (

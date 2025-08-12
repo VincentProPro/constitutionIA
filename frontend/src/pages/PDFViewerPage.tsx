@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeftIcon, 
   DocumentTextIcon, 
@@ -10,10 +10,13 @@ import {
   InformationCircleIcon
 } from '@heroicons/react/24/outline';
 import AIChat from '../components/AIChat.js';
+import { downloadFileFromUrl, createBlobUrlFromUrl } from '../utils/downloadFile';
 
 const PDFViewerPage: React.FC = () => {
   const { filename } = useParams<{ filename: string }>();
   const navigate = useNavigate();
+  const location = useLocation() as { state?: { title?: string } };
+  const passedTitle = location.state?.title;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -23,7 +26,10 @@ const PDFViewerPage: React.FC = () => {
 
   console.log('PDFViewerPage - isChatOpen:', isChatOpen, 'filename:', filename);
 
-  const pdfUrl = `/api/constitutions/files/${filename || ''}`;
+  // Toujours encoder le segment de chemin pour éviter les erreurs (espaces, accents)
+  const encodedFilename = useMemo(() => encodeURIComponent(filename || ''), [filename]);
+  const cacheBuster = useMemo(() => Date.now(), [filename]);
+  const pdfUrl = `/api/constitutions/files/${encodedFilename}?v=${cacheBuster}`;
 
   useEffect(() => {
     console.log('PDFViewerPage - filename:', filename);
@@ -35,15 +41,21 @@ const PDFViewerPage: React.FC = () => {
       return;
     }
 
-    // Vérifier que le fichier existe
-    fetch(pdfUrl)
-      .then(response => {
+    // Vérifier que le fichier existe et préparer une URL blob pour l'iframe
+    let revokeUrl: string | null = null;
+
+    fetch(pdfUrl, { method: 'HEAD' })
+      .then(async response => {
         console.log('PDFViewerPage - response status:', response.status);
         console.log('PDFViewerPage - response ok:', response.ok);
         
         if (!response.ok) {
           throw new Error(`Fichier non trouvé (${response.status})`);
         }
+        // Créer une URL blob pour un affichage fiable dans l'iframe
+        const blobUrl = await createBlobUrlFromUrl(pdfUrl);
+        revokeUrl = blobUrl;
+        setIframeSrc(blobUrl);
         setLoading(false);
       })
       .catch(err => {
@@ -51,21 +63,36 @@ const PDFViewerPage: React.FC = () => {
         setError(`Erreur lors du chargement du PDF: ${err.message}`);
         setLoading(false);
       });
+
+    return () => {
+      if (revokeUrl) {
+        URL.revokeObjectURL(revokeUrl);
+      }
+    };
   }, [filename, pdfUrl]);
+
+  const [iframeSrc, setIframeSrc] = useState<string>('');
 
   const handleBack = () => {
     navigate('/constitutions');
   };
 
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = pdfUrl;
-    link.download = filename || 'constitution.pdf';
-    link.click();
+  const handleDownload = async () => {
+    const safeName = (filename || 'constitution').endsWith('.pdf')
+      ? (filename as string)
+      : `${filename || 'constitution'}.pdf`;
+    try {
+      await downloadFileFromUrl(pdfUrl, safeName);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const formatFilename = (name: string) => {
-    return name.replace(/%20/g, ' ').replace('.pdf', '');
+    const base = passedTitle && passedTitle.trim().length > 0
+      ? passedTitle
+      : decodeURIComponent(name).replace(/%20/g, ' ').replace(/\.pdf$/i, '');
+    return base.length > 20 ? base.slice(0, 20) + '...' : base;
   };
 
   const handleOpenChat = () => {
@@ -142,7 +169,7 @@ const PDFViewerPage: React.FC = () => {
                   <DocumentTextIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                 </div>
                 <div className="min-w-0 flex-1 sm:flex-none">
-                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 break-words leading-tight">
+                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 break-words leading-tight" title={(passedTitle || decodeURIComponent(filename || '').replace(/%20/g, ' '))}>
                     {formatFilename(filename || '')}
                   </h1>
                   <p className="text-xs sm:text-sm text-gray-500">Document PDF</p>
@@ -238,22 +265,27 @@ const PDFViewerPage: React.FC = () => {
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl overflow-hidden border border-gray-200">
               <div className="h-[calc(100vh-200px)] sm:h-[calc(100vh-280px)] min-h-[400px] sm:min-h-[600px] relative">
                 {/* Indicateur de chargement du PDF */}
-                <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10" id="pdf-loading">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-2 border-blue-600 border-t-transparent mx-auto mb-2"></div>
-                    <p className="text-xs sm:text-sm text-gray-600">Chargement du PDF...</p>
+                {loading && (
+                  <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-10" id="pdf-loading">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-2 border-blue-600 border-t-transparent mx-auto mb-2"></div>
+                      <p className="text-xs sm:text-sm text-gray-600">Chargement du PDF...</p>
+                    </div>
                   </div>
-                </div>
+                )}
                 
                 <iframe
-                  src={pdfUrl}
+                  src={iframeSrc || pdfUrl}
                   className="w-full h-full border-0"
                   title={filename}
                   onLoad={() => {
-                    const loadingElement = document.getElementById('pdf-loading');
-                    if (loadingElement) {
-                      loadingElement.style.display = 'none';
-                    }
+                    console.log('PDF iframe loaded successfully');
+                    setLoading(false);
+                  }}
+                  onError={() => {
+                    console.error('PDF iframe failed to load');
+                    setLoading(false);
+                    setError('Le PDF n\'a pas pu être chargé');
                   }}
                 />
               </div>
