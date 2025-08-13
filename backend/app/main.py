@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import ai_copilot, constitutions
+from app.routers import ai_copilot, constitutions, chatnow
 from app.database import engine
 from app.models import constitution, user
 from app.services.automation_service import start_automation_service, stop_automation_service
@@ -35,6 +35,7 @@ app.add_middleware(
 # Inclure les routeurs
 app.include_router(ai_copilot.router, prefix="/api/ai", tags=["AI Copilot"])
 app.include_router(constitutions.router, prefix="/api/constitutions", tags=["Constitutions"])
+app.include_router(chatnow.router, tags=["ChatNow"])
 
 @app.on_event("startup")
 async def startup_event():

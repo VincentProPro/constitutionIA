@@ -36,22 +36,27 @@ const HomePage: React.FC = () => {
     }
     return `/images/slider/slide-${slideNumber}-optimized.jpg`;
   };
-
+  // id: 1,
+  // title: "ConstitutionIA",
+  // subtitle: "Plateforme de gestion des constitutions",
+  // description: "Accédez facilement aux constitutions de la Guinée et interrogez notre assistant IA",
+  // slideNumber: 7, // Utilise slide-7.jpg pour la première image
+  // cta: "Comprendre la nouvelle Constitution"
   // Données du slider avec des images locales
   const sliderData = [
     {
       id: 1,
       title: "ConstitutionIA",
-      subtitle: "Plateforme de gestion des constitutions",
-      description: "Accédez facilement aux constitutions de la Guinée et interrogez notre assistant IA",
+      subtitle: "Comprendre la nouvelle Constitution",
+      description: "Interrogez l'assistant IA pour comprendre la nouvelle Constitution",
       slideNumber: 7, // Utilise slide-7.jpg pour la première image
-      cta: "Explorer les Constitutions"
+      cta: "Discuter avec l'IA"
     },
     {
       id: 2,
       title: "Votre Assistant IA",
       subtitle: "Assistant intelligent",
-      description: "Posez vos questions à notre IA spécialisée dans les constitutions",
+      description: "Posez vos questions à notre IA spécialisée dans la nouvelle constitution",
       slideNumber: 2,
       cta: "Commencer"
     },
@@ -61,15 +66,15 @@ const HomePage: React.FC = () => {
       subtitle: "À LA NOUVELLE CONSTITUTION",
       description: "Découvrez la nouvelle Constitution guinéenne",
       slideNumber: 5,
-      cta: "Découvrir"
+      cta: "Commencer"
     },
     {
       id: 4,
       title: "Analyse Intelligente",
       subtitle: "Compréhension approfondie",
-      description: "Analysez les constitutions avec des outils d'IA avancés pour une meilleure compréhension",
+      description: "Analysez la nouvelle constitution avec des outils d'IA avancés pour une meilleure compréhension",
       slideNumber: 4,
-      cta: "Analyser"
+      cta: "Commencer"
     }
   ];
 
@@ -149,7 +154,7 @@ const HomePage: React.FC = () => {
                   {slide.description}
                 </p>
                 <Link
-                  to="/constitutions"
+                  to={slide.id === 2 ? "/chatnow" : "/chatnow"}
                   className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 md:px-8 py-2 sm:py-3 rounded-lg font-semibold transition-colors duration-200 text-sm sm:text-base"
                 >
                   {slide.cta}

@@ -1,287 +1,346 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import axios from 'axios';
 import { useNotificationContext } from '../contexts/NotificationContext';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
 
-interface Message {
+// --- Types ---
+export type Role = "user" | "assistant" | "system";
+
+interface ChatMessage {
   id: string;
-  text: string;
-  isUser: boolean;
-  timestamp: Date;
-  constitution?: string;
+  role: Role;
+  content: string;
+  createdAt: string; // ISO string for hydration safety
 }
 
-const ChatNowPage: React.FC = () => {
-  const { user } = useAuth();
-  const { showError } = useNotificationContext();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedConstitution, setSelectedConstitution] = useState('');
-  const [constitutions, setConstitutions] = useState<any[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+// --- Utilities ---
+const isoNow = () => new Date().toISOString();
 
-  // Auto-scroll to bottom when new messages arrive
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+const formatTime = (iso: string) => {
+  try {
+    return new Date(iso).toLocaleTimeString();
+  } catch {
+    return "";
+  }
+};
+
+const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+// Persist chat in localStorage (simple, optional)
+const STORAGE_KEY = "chat-ia-session-v1";
+
+function usePersistentState<T>(key: string, initial: T) {
+  const [state, setState] = useState<T>(() => {
+    if (typeof window === "undefined") return initial;
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : initial;
+    } catch {
+      return initial;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch {}
+  }, [key, state]);
+
+  return [state, setState] as const;
+}
+
+// --- Real API Integration ---
+async function sendToAIBackend(prompt: string, history: ChatMessage[]): Promise<string> {
+  try {
+    const response = await axios.post('/api/chatnow/chat', {
+      question: prompt,
+      user_id: null,
+      chat_history: history.slice(-6) // Envoyer les 6 derniers messages pour le contexte
+    }, {
+      timeout: 45000, // 45 secondes de timeout
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.data && response.data.response) {
+      return response.data.response;
+    } else {
+      throw new Error('Réponse invalide du serveur');
+    }
+  } catch (error: any) {
+    console.error('Erreur API ChatNow:', error);
+    
+    if (error.response) {
+      // Erreur de réponse du serveur
+      const status = error.response.status;
+      const data = error.response.data;
+      
+      if (status === 400) {
+        throw new Error(data.detail || 'Requête invalide');
+      } else if (status === 500) {
+        throw new Error('Erreur serveur. Veuillez réessayer.');
+      } else {
+        throw new Error(data.detail || `Erreur ${status}: ${data.message || 'Erreur inconnue'}`);
+      }
+    } else if (error.request) {
+      // Erreur de réseau
+      throw new Error('Erreur de connexion. Vérifiez votre connexion internet.');
+    } else if (error.code === 'ECONNABORTED') {
+      throw new Error('Délai d\'attente dépassé. Veuillez réessayer.');
+    } else {
+      throw new Error('Une erreur inattendue est survenue.');
+    }
+  }
+}
+
+// --- Components ---
+const MessageBubble: React.FC<{ message: ChatMessage } & { isFirstOfGroup: boolean }> = ({ message, isFirstOfGroup }) => {
+  const isUser = message.role === "user";
+  return (
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+      <div className={`max-w-[85%] sm:max-w-[80%] rounded-2xl px-3 sm:px-4 py-2 shadow-sm ${isUser ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"}`}>
+        {isFirstOfGroup && (
+          <div className={`text-[10px] mb-1 ${isUser ? "text-blue-100" : "text-gray-500"}`}>{isUser ? "Vous" : "Assistant"}</div>
+        )}
+        <div className="whitespace-pre-wrap text-sm leading-relaxed break-words">{message.content}</div>
+        <div className={`text-[10px] mt-1 ${isUser ? "text-blue-100" : "text-gray-500"}`}>{formatTime(message.createdAt)}</div>
+      </div>
+    </div>
+  );
+};
+
+const TypingDots: React.FC = () => (
+  <div className="flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm text-gray-600">
+    <div className="animate-bounce h-2 w-2 rounded-full bg-gray-400"></div>
+    <div className="animate-bounce [animation-delay:120ms] h-2 w-2 rounded-full bg-gray-400"></div>
+    <div className="animate-bounce [animation-delay:240ms] h-2 w-2 rounded-full bg-gray-400"></div>
+    <span className="ml-1 sm:ml-2">L'assistant réfléchit…</span>
+  </div>
+);
+
+// --- Main Page Component ---
+const ChatNowPage: React.FC = () => {
+  console.log('ChatNowPage: Composant en cours de chargement...');
+  
+  // Déplacer l'appel du hook au début, sans condition
+  const notificationContext = useNotificationContext();
+  const { showSuccess, showError, showWarning } = notificationContext || {};
+
+  const [messages, setMessages] = usePersistentState<ChatMessage[]>(STORAGE_KEY, [
+    {
+      id: uid(),
+      role: "assistant",
+      content: "Bonjour 👋 Je suis votre assistant IA spécialisé dans l'analyse de la constitution de la Guinée.\n\nJe peux vous aider à :\n• Trouver des articles spécifiques\n• Expliquer les droits et libertés\n• Clarifier le fonctionnement des institutions\n• Analyser les principes constitutionnels\n• Répondre à vos questions sur la constitution\n\nPosez-moi votre question et je vous répondrai en me basant sur la constitution de la Guinée.",
+      createdAt: isoNow(),
+    },
+  ]);
+
+  // Questions amorces clickables
+  const quickQuestions = [
+    "Quelle est la durée du mandat présidentiel ?",
+    "Quels sont les droits fondamentaux des citoyens ?",
+    "Comment fonctionne le pouvoir exécutif ?",
+    "Que dit la constitution sur l'éducation ?",
+    "Quels sont les devoirs des citoyens ?",
+    "Comment sont organisées les élections ?"
+  ];
+
+  const handleQuickQuestion = (question: string) => {
+    setInput(question);
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Load constitutions on component mount
+  const canSend = useMemo(() => input.trim().length > 0 && !isLoading, [input, isLoading]);
+
   useEffect(() => {
-    fetchConstitutions();
+    console.log('ChatNowPage: Composant monté avec succès');
   }, []);
 
-  const fetchConstitutions = async () => {
-    try {
-      const response = await fetch('/api/constitutions/');
-      if (response.ok) {
-        const data = await response.json();
-        setConstitutions(data);
-        if (data.length > 0) {
-          setSelectedConstitution(data[0].filename);
-        }
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement des constitutions:', error);
-      showError('Erreur', 'Erreur lors du chargement des constitutions');
+  // Scroll automatique optimisé - seulement pour les nouveaux messages
+  useEffect(() => {
+    if (messages.length > 1) {
+      // Utiliser requestAnimationFrame pour un scroll plus fluide
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollIntoView({ 
+          behavior: "smooth",
+          block: "end"
+        });
+      });
     }
-  };
+  }, [messages.length]); // Dépendance sur la longueur plutôt que sur l'objet messages
 
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || !selectedConstitution) return;
+  const sendMessage = useCallback(async () => {
+    if (!canSend) return;
+    setError(null);
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: inputMessage,
-      isUser: true,
-      timestamp: new Date(),
-      constitution: selectedConstitution
+    const userMsg: ChatMessage = {
+      id: uid(),
+      role: "user",
+      content: input.trim(),
+      createdAt: isoNow(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
+    // Mettre à jour l'état en une seule fois pour éviter les re-renders multiples
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/ai/chat/pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          question: inputMessage,
-          filename: selectedConstitution
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: data.response,
-          isUser: false,
-          timestamp: new Date(),
-          constitution: selectedConstitution
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      } else {
-        const errorData = await response.json();
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: `Erreur: ${errorData.detail || 'Une erreur s\'est produite'}`,
-          isUser: false,
-          timestamp: new Date(),
-          constitution: selectedConstitution
-        };
-        setMessages(prev => [...prev, errorMessage]);
-        showError('Erreur', 'Erreur lors de la communication avec l\'IA');
-      }
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi du message:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: 'Erreur de connexion. Veuillez réessayer.',
-        isUser: false,
-        timestamp: new Date(),
-        constitution: selectedConstitution
+      // Utiliser les messages actuels pour le contexte
+      const currentMessages = [...messages, userMsg];
+      const reply = await sendToAIBackend(userMsg.content, currentMessages);
+      
+      const aiMsg: ChatMessage = {
+        id: uid(),
+        role: "assistant",
+        content: reply,
+        createdAt: isoNow(),
       };
-      setMessages(prev => [...prev, errorMessage]);
-      showError('Erreur', 'Erreur de connexion');
+      
+      // Mettre à jour avec le nouveau message de l'IA
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (e: any) {
+      const errorMessage = e.message || "Une erreur est survenue. Veuillez réessayer.";
+      setError(errorMessage);
+      if (showError) {
+        showError('Erreur de communication', errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [canSend, messages, showError]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
-  };
+  }, [sendMessage]);
 
-  const clearChat = () => {
-    setMessages([]);
-  };
+  const clearChat = useCallback(() => {
+    const newMessage: ChatMessage = {
+      id: uid(),
+      role: "assistant",
+      content: "Bonjour 👋 Je suis votre assistant IA spécialisé dans l'analyse de la constitution de la Guinée.\n\nJe peux vous aider à :\n• Trouver des articles spécifiques\n• Expliquer les droits et libertés\n• Clarifier le fonctionnement des institutions\n• Analyser les principes constitutionnels\n• Répondre à vos questions sur la constitution\n\nPosez-moi votre question et je vous répondrai en me basant sur la constitution de la Guinée.",
+      createdAt: isoNow(),
+    };
+    
+    // Réinitialiser tous les états en une seule fois
+    setMessages([newMessage]);
+    setError(null);
+    setIsLoading(false);
+  }, []);
 
-  const getConstitutionTitle = (filename: string) => {
-    const constitution = constitutions.find(c => c.filename === filename);
-    return constitution ? constitution.title : filename;
-  };
+  const groups = useMemo(() => {
+    const result: { first: boolean; msg: ChatMessage }[] = [];
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const prev = messages[i - 1];
+      const first = !prev || prev.role !== msg.role;
+      result.push({ first, msg });
+    }
+    return result;
+  }, [messages.length]); // Dépendance sur la longueur plutôt que sur l'objet messages
 
+  console.log('ChatNowPage: Rendu du composant');
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-4">
-            💬 ChatNow
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <div className="max-w-4xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
+        <div className="mb-2 sm:mb-4 text-center">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+            Tout Comprendre sur la Nouvelle Constitution
           </h1>
-          <p className="text-lg text-gray-600">
-            Posez vos questions sur les constitutions et obtenez des réponses instantanées
+          <p className="text-gray-600 text-xs sm:text-sm mb-4 px-2">
+            Posez une question, appuyez sur <kbd className="px-1 py-0.5 rounded border text-xs">Entrée</kbd> pour envoyer. 
+            Utilisez <kbd className="px-1 py-0.5 rounded border text-xs">Shift</kbd>+<kbd className="px-1 py-0.5 rounded border text-xs">Entrée</kbd> pour une nouvelle ligne.
           </p>
         </div>
 
-        {/* Constitution Selector */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            📄 Constitution à consulter
-          </label>
-          <select
-            value={selectedConstitution}
-            onChange={(e) => setSelectedConstitution(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {constitutions.map((constitution) => (
-              <option key={constitution.id} value={constitution.filename}>
-                {constitution.title}
-              </option>
+        <div className="bg-white rounded-2xl shadow-md overflow-hidden max-w-3xl mx-auto">
+          <div className="h-[calc(100vh-280px)] sm:h-[calc(100vh-320px)] md:h-[calc(100vh-350px)] overflow-y-auto p-2 sm:p-4 space-y-3">
+            {groups.map(({ first, msg }) => (
+              <MessageBubble key={msg.id} message={msg} isFirstOfGroup={first} />
             ))}
-          </select>
-          {selectedConstitution && (
-            <p className="text-sm text-gray-500 mt-2">
-              Constitution active: <span className="font-medium">{getConstitutionTitle(selectedConstitution)}</span>
-            </p>
-          )}
-        </div>
 
-        {/* Chat Container */}
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          {/* Chat Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-semibold text-white">
-                  Assistant ConstitutionIA
-                </h2>
-                <p className="text-blue-100 text-sm">
-                  {selectedConstitution ? getConstitutionTitle(selectedConstitution) : 'Sélectionnez une constitution'}
-                </p>
-              </div>
-              <button
-                onClick={clearChat}
-                className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                🗑️ Effacer
-              </button>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="h-96 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <div className="text-6xl mb-4">🤖</div>
-                <p className="text-lg font-medium mb-2">Bienvenue dans ChatNow !</p>
-                <p className="text-sm">
-                  Posez vos questions sur la constitution sélectionnée et obtenez des réponses précises.
-                </p>
-                <div className="mt-4 text-xs text-gray-400">
-                  💡 Exemples de questions :
-                  <ul className="mt-2 space-y-1">
-                    <li>• "Quelle est la durée du mandat présidentiel ?"</li>
-                    <li>• "Que dit l'article 44 sur les droits des citoyens ?"</li>
-                    <li>• "Comment fonctionne le pouvoir judiciaire ?"</li>
-                  </ul>
-                </div>
-              </div>
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      message.isUser
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
+            {/* Questions amorces clickables - affichées seulement si c'est le premier message */}
+            {messages.length === 1 && (
+              <div className="flex flex-wrap gap-2 justify-center mt-4">
+                {quickQuestions.map((question, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleQuickQuestion(question)}
+                    className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs sm:text-sm rounded-lg transition-colors duration-200 border border-blue-200 hover:border-blue-300"
                   >
-                    <div className="text-sm">{message.text}</div>
-                    <div className={`text-xs mt-1 ${
-                      message.isUser ? 'text-blue-100' : 'text-gray-500'
-                    }`}>
-                      {message.timestamp.toLocaleTimeString()}
-                    </div>
-                  </div>
-                </div>
-              ))
+                    {question}
+                  </button>
+                ))}
+              </div>
             )}
-            
+
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-gray-100 text-gray-800 max-w-xs lg:max-w-md px-4 py-2 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    <span className="text-sm">L'assistant réfléchit...</span>
-                  </div>
+                <div className="bg-gray-100 rounded-2xl px-3 sm:px-4 py-2">
+                  <TypingDots />
                 </div>
               </div>
             )}
-            
-            <div ref={messagesEndRef} />
+
+            <div ref={scrollRef} />
           </div>
 
-          {/* Input Area */}
-          <div className="border-t border-gray-200 p-4">
-            <div className="flex space-x-4">
-              <div className="flex-1">
-                <textarea
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Posez votre question sur la constitution..."
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                  rows={2}
-                  disabled={isLoading || !selectedConstitution}
-                />
-              </div>
+          <div className="border-t border-gray-200 p-2 sm:p-3">
+            {error && (
+              <div className="mb-2 text-xs sm:text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>
+            )}
+            <div className="flex items-end gap-2 sm:gap-3">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Écrivez votre message…"
+                rows={2}
+                className="flex-1 resize-none rounded-xl border border-gray-300 p-2 sm:p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                style={{ resize: 'none' }}
+              />
               <button
                 onClick={sendMessage}
-                disabled={!inputMessage.trim() || isLoading || !selectedConstitution}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg transition-colors flex items-center space-x-2"
+                disabled={!canSend}
+                className="h-10 px-3 sm:px-4 rounded-xl bg-blue-600 text-white text-xs sm:text-sm font-medium disabled:bg-gray-400 hover:bg-blue-700 transition-colors whitespace-nowrap"
               >
-                <span>📤</span>
-                <span>Envoyer</span>
+                Envoyer
               </button>
             </div>
-            <div className="text-xs text-gray-500 mt-2">
-              Appuyez sur Entrée pour envoyer, Shift+Entrée pour une nouvelle ligne
+            <div className="mt-1 text-[10px] sm:text-[11px] text-gray-500">
+              Conseil : soyez précis pour obtenir des réponses plus pertinentes.
             </div>
           </div>
         </div>
 
-        {/* Tips */}
-        <div className="mt-6 bg-blue-50 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-800 mb-2">💡 Conseils d'utilisation</h3>
-          <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Sélectionnez d'abord la constitution que vous souhaitez consulter</li>
-            <li>• Posez des questions précises pour obtenir des réponses détaillées</li>
-            <li>• Vous pouvez demander des informations sur des articles spécifiques</li>
-            <li>• L'assistant cite toujours les sources exactes de ses réponses</li>
+        <div className="mt-2 sm:mt-4 flex justify-center max-w-3xl mx-auto">
+          <button 
+            onClick={clearChat}
+            className="text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+          >
+            🗑️ Effacer le chat
+          </button>
+        </div>
+
+        <div className="mt-2 sm:mt-4 bg-blue-50 text-blue-800 rounded-xl p-3 sm:p-4 max-w-3xl mx-auto">
+          <div className="font-semibold mb-1 text-sm sm:text-base">💡 Astuces pour les questions constitutionnelles</div>
+          <ul className="list-disc list-inside text-xs sm:text-sm space-y-1">
+            <li>Demandez des informations sur des articles spécifiques : <em>"Que dit l'article 15 de la constitution ?"</em></li>
+            <li>Posez des questions sur les droits et libertés : <em>"Quels sont les droits fondamentaux garantis ?"</em></li>
+            <li>Interrogez sur les institutions : <em>"Comment fonctionne le pouvoir exécutif ?"</em></li>
+            <li>Demandez des explications sur les principes constitutionnels</li>
+            <li>Relancez l'IA pour préciser un point : <em>"peux‑tu détailler le point 2 ?"</em></li>
           </ul>
         </div>
       </div>
